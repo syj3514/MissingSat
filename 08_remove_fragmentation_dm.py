@@ -64,8 +64,8 @@ pouts = pouts[pouts < snap1.iout][::-1]
 print(pouts)
 
 for host1 in result1s:
-    if(os.path.exists(f"./database/08_nh_scores.pickle")): continue
-    sats = cut_sphere(gal1s, host1['x'], host1['y'], host1['z'], 1.5*host1['r200_code'], both_sphere=True)
+    if(os.path.exists(f"./database/08_nh_dm_scores.pickle")): continue
+    sats = cut_sphere(hal1s, host1['x'], host1['y'], host1['z'], 1.5*host1['r200_code'], both_sphere=True)
     sats = sats[sats['id'] != host1['id']]
     print(f"[{host1['id']:04d}] {len(sats)} satellites")
 
@@ -78,24 +78,24 @@ for host1 in result1s:
     give_scores = {}
     take_scores = {}
 
-    def get_members(gal):
+    def get_members(hal):
         global members, snap1s
-        if(gal['timestep'] in members.keys()):
-            if(gal['id'] in members[gal['timestep']].keys()):
-                return members[gal['timestep']][gal['id']]
+        if(hal['timestep'] in members.keys()):
+            if(hal['id'] in members[hal['timestep']].keys()):
+                return members[hal['timestep']][hal['id']]
         else:
-            members[gal['timestep']] = {}
-        members[gal['timestep']][gal['id']] = uhmi.HaloMaker.read_member_part(snap1s.get_snap(gal['timestep']), gal['id'], galaxy=True, simple=True)
-        return members[gal['timestep']][gal['id']]
+            members[hal['timestep']] = {}
+        members[hal['timestep']][hal['id']] = uhmi.HaloMaker.read_member_part(snap1s.get_snap(hal['timestep']), hal['id'], galaxy=False, simple=True)
+        return members[hal['timestep']][hal['id']]
 
-    if(os.path.exists(f"./database/08_nh_give_scores_host{host1['id']:04d}.pickle")):
-        give_scores = pklload(f"./database/08_nh_give_scores_host{host1['id']:04d}.pickle")
-        take_scores = pklload(f"./database/08_nh_take_scores_host{host1['id']:04d}.pickle")
+    if(os.path.exists(f"./database/08_nh_give_dm_scores_host{host1['id']:04d}.pickle")):
+        give_scores = pklload(f"./database/08_nh_give_dm_scores_host{host1['id']:04d}.pickle")
+        take_scores = pklload(f"./database/08_nh_take_dm_scores_host{host1['id']:04d}.pickle")
     else:
         for ip, pout in tqdm( enumerate(pouts), total=len(pouts) ):
             psnap = snap1s.get_snap(pout)
             # psnap.set_box(sat, 2*rrange)
-            pgals = uhmi.HaloMaker.load(psnap, galaxy=True, double_precision=dp)
+            phals = uhmi.HaloMaker.load(psnap, galaxy=False, double_precision=dp)
             for sat in sats:
                 if(sat['id'] in centers.keys()):
                     center = centers[sat['id']]
@@ -103,7 +103,7 @@ for host1 in result1s:
                     center = [sat['x'], sat['y'], sat['z']]
                     centers[sat['id']] = center
                 my_member = get_members(sat)
-                pneighbors = cut_box(pgals, *center, rrange)
+                pneighbors = cut_box(phals, *center, rrange)
 
 
                 if(len(pneighbors)==0): continue
@@ -126,30 +126,28 @@ for host1 in result1s:
                     take_scores[sat['id']] = np.zeros(len(pouts))
                 
                 all_scores[sat['id']][ip] = pneighbors['id'][argmax_all] + all_score[argmax_all]
-                # if(sat['id']==178): print(pneighbors['id'][argmax_all] + all_score[argmax_all], all_score[argmax_all])
-                # if(sat['id']==178): print(give_score)
                 give_scores[sat['id']][ip] = pneighbors['id'][argmax_give] + give_score[argmax_give]
                 take_scores[sat['id']][ip] = pneighbors['id'][argmax_take] + take_score[argmax_take]
                 centers[sat['id']] = [ pneighbors['x'][argmax_all], pneighbors['y'][argmax_all], pneighbors['z'][argmax_all] ]
                 
-    pklsave(give_scores, f"./database/08_nh_give_scores_host{host1['id']:04d}.pickle", overwrite=True)
-    pklsave(take_scores, f"./database/08_nh_take_scores_host{host1['id']:04d}.pickle", overwrite=True)
+    pklsave(give_scores, f"./database/08_nh_give_dm_scores_host{host1['id']:04d}.pickle", overwrite=True)
+    pklsave(take_scores, f"./database/08_nh_take_dm_scores_host{host1['id']:04d}.pickle", overwrite=True)
 
-if(os.path.exists(f"./database/08_nh_scores.pickle")):
-    score_results = pklload(f"./database/08_nh_scores.pickle")
+if(os.path.exists(f"./database/08_nh_dm_scores.pickle")):
+    score_results = pklload(f"./database/08_nh_dm_scores.pickle")
 else:
     score_results = {}
     score_results['give'] = {}
     score_results['take'] = {}
     for host1 in result1s:
-        give_scores = pklload(f"./database/08_nh_give_scores_host{host1['id']:04d}.pickle")
-        take_scores = pklload(f"./database/08_nh_take_scores_host{host1['id']:04d}.pickle")
+        give_scores = pklload(f"./database/08_nh_give_dm_scores_host{host1['id']:04d}.pickle")
+        take_scores = pklload(f"./database/08_nh_take_dm_scores_host{host1['id']:04d}.pickle")
         score_results['give'][host1['id']] = give_scores
         score_results['take'][host1['id']] = take_scores
 
-        os.remove(f"./database/08_nh_give_scores_host{host1['id']:04d}.pickle")
-        os.remove(f"./database/08_nh_take_scores_host{host1['id']:04d}.pickle")
-    pklsave(score_results, f"./database/08_nh_scores.pickle", overwrite=True)
+        os.remove(f"./database/08_nh_give_dm_scores_host{host1['id']:04d}.pickle")
+        os.remove(f"./database/08_nh_take_dm_scores_host{host1['id']:04d}.pickle")
+    pklsave(score_results, f"./database/08_nh_dm_scores.pickle", overwrite=True)
 
 
 
@@ -170,7 +168,7 @@ for host1 in result1s:
     give_scores = score_results['give'][host1['id']]
     take_scores = score_results['take'][host1['id']]
     for target_id in tqdm( give_scores.keys() ):
-        if(not os.path.exists(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_sat{target_id:04d}.png")):
+        if(not os.path.exists(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_sub{target_id:04d}.png")):
             fig, axes = plt.subplots(1,2, figsize=(8,4))
             ax = axes[1]
             give_percents = np.zeros(len(pouts))
@@ -187,11 +185,11 @@ for host1 in result1s:
                 # print(f"{ip:04d}\tgive {give_percent:.2f}% & take {take_percent:.2f}%")
 
                 isnap = snap1s.get_snap(ip)
-                igals = uhmi.HaloMaker.load(isnap, galaxy=True, double_precision=dp)
-                igal = igals[give_id-1]
-                xs[i] = igal['x']; ys[i] = igal['y']
-                # ax.scatter(igal['x'],igal['y'], s=1, color='k')
-                cir = plt.Circle((igal['x'],igal['y']), igal['r'], color=cmap(norm(ip)), fill=False, lw=0.5)
+                ihals = uhmi.HaloMaker.load(isnap, galaxy=False, double_precision=dp)
+                ihal = ihals[give_id-1]
+                xs[i] = ihal['x']; ys[i] = ihal['y']
+                # ax.scatter(ihal['x'],ihal['y'], s=1, color='k')
+                cir = plt.Circle((ihal['x'],ihal['y']), ihal['r'], color=cmap(norm(ip)), fill=False, lw=0.5)
                 ax.add_patch(cir)
                 i+=1
             ax.plot(xs, ys, color='k', lw=0.5)
@@ -222,54 +220,54 @@ for host1 in result1s:
             ax.set_title("Shared particle percentage")
 
             plt.subplots_adjust(wspace=0.05)
-            plt.savefig(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_sat{target_id:04d}.png", dpi=300, facecolor='w')
+            plt.savefig(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_sub{target_id:04d}.png", dpi=300, facecolor='w')
             plt.close()
 
 
 print("\n[Draw 2D]\n")
 for host1 in result1s:
     print(f"{host1['id']:04d}")
-    if(os.path.exists(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_2d.png")): continue
+    if(os.path.exists(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_dm_2d.png")): continue
     dic = pair1s[host1['id']]
     pairs = dic['pair']
     all_sats = dic['all_sat']
     all_subs = dic['all_sub']
-    # sats = gal1s[all_sats-1]
+    # sats = hal1s[all_subs-1]
 
     snap1.set_box_halo(host1, 1.5, radius_name='r200_code')
-    star = uri.Particle( pklload(f"./database/parts/nh_star_{host1['id']:04}.pickle"), snap1)
-    # dm = uri.Particle( pklload(f"./database/parts/nh_dm_{host1['id']:04}.pickle"), snap1)
+    # star = uri.Particle( pklload(f"./database/parts/nh_star_{host1['id']:04}.pickle"), snap1)
+    dm = uri.Particle( pklload(f"./database/parts/nh_dm_{host1['id']:04}.pickle"), snap1)
     # cell = uri.Cell( pklload(f"./database/parts/nh_cell_{host1['id']:04}.pickle"), snap1 )
-    rband = measure_luminosity(star, 'SDSS_r')
+    # rband = measure_luminosity(star, 'SDSS_r')
 
     give_scores = score_results['give'][host1['id']]
     take_scores = score_results['take'][host1['id']]
 
     fig, ax = fancy_axis(figsize=(8, 8), dpi=400)
     
-    painter.draw_partmap(star, box=snap1.box, ax=ax, cmap=cmr.arctic, qscale=5, weights=rband)
+    painter.draw_partmap(dm, box=snap1.box, ax=ax, cmap=cmr.arctic, qscale=5)#, weights=rband)
 
     cir = circle(host1, rname='r200_code', ls=':', alpha=1, color='w')
     ax.add_patch(cir)
 
-    pair_sat = [pair[1] for pair in pairs]
+    pair_sub = [pair[1] for pair in pairs]
     for target_id in tqdm( give_scores.keys() ):
-        sat = gal1s[target_id-1]
+        sub = hal1s[target_id-1]
         temp = 2*np.median( take_scores[target_id]%1 )
         color = 'yellow' if(temp>0.3) else 'red'
         lw = 1 if(temp>0.3) else 0.5
-        cir = circle(sat, rname='r', color=color, alpha=1, lw=lw)
+        cir = circle(sub, rname='rvir', color=color, alpha=1, lw=lw)
         ax.add_patch(cir)
         if(temp>0.3):
-            if(target_id in pair_sat):
-                where = np.where(np.array(pair_sat)==target_id)[0][0]
-                sub = hal1s[pairs[where][0]-1]
-                cir = circle(sub, rname='rvir', ls='--', color='w', alpha=1, lw=lw)
+            if(target_id in pair_sub):
+                where = np.where(np.array(pair_sub)==target_id)[0][0]
+                sat_of_sub = gal1s[pairs[where][0]-1]
+                cir = circle(sat_of_sub, rname='r', ls='--', color='w', alpha=1, lw=lw)
                 ax.add_patch(cir)
-            ax.text(sat['x'], sat['y']+sat['r'], f"{target_id}({100*temp:.1f}%)", color='yellow', fontsize=4, ha='center', va='bottom')
+            ax.text(sub['x'], sub['y']+sub['rvir'], f"{target_id}({100*temp:.1f}%)", color='yellow', fontsize=4, ha='center', va='bottom')
             temp = 2*np.median( give_scores[target_id]%1 )
-            ax.text(sat['x'], sat['y']-sat['r'], f"({100*temp:.1f}%)", color='orange', fontsize=4, ha='center', va='top')
+            ax.text(sub['x'], sub['y']-sub['rvir'], f"({100*temp:.1f}%)", color='orange', fontsize=4, ha='center', va='top')
     add_scalebar(ax, snap1.unit_l)
 
-    plt.savefig(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_2d.png", dpi=300, facecolor='w')
+    plt.savefig(f"./database/photo/08_fragmentation/NH_host{host1['id']:04d}_dm_2d.png", dpi=300, facecolor='w')
     plt.close()
