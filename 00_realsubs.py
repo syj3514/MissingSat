@@ -208,7 +208,8 @@ def make_gcatalog(Hostkey:int, table:np.void, istar:uri.Particle, idm:uri.Partic
     return result
 
 sub_dtype = LG[1]['subs'].dtype
-sub_dtype = np.dtype(sub_dtype.descr + [('r200kpc', '<f8'), ('m200', '<f8'), ('r200', '<f8')])
+if(not 'r200kpc' in sub_dtype.names):
+    sub_dtype = np.dtype(sub_dtype.descr + [('r200kpc', '<f8'), ('m200', '<f8'), ('r200', '<f8')])
 def make_hcatalog(Hostkey:int, table:np.void, istar:uri.Particle, idm:uri.Particle, icell:uri.Cell) -> np.void:
     global snap, sub_dtype, database
     assert 'm200' in table.dtype.names
@@ -447,12 +448,12 @@ def make_udg(host:int, istar_vir:uri.Particle, idm_vir:uri.Particle, icell_vir:u
     result['i_mem'] = measure_luminosity(istar_vir, 'SDSS_i', model='cb07', total=True)
     result['z_mem'] = measure_luminosity(istar_vir, 'SDSS_z', model='cb07', total=True)
     result['metal_mem'] = np.sum(istar_vir['metal'] * istar_vir['m']) / np.sum(istar_vir['m'])
-    result['ager_mem'] = np.average(istar_vir['age', 'Gyr'], weights=rband)
-    result['t50_mem'] = calc_tform(istar_vir, rband, ratio=0.5)
-    result['t90_mem'] = calc_tform(istar_vir, rband, ratio=0.9)
+    result['ager_mem'] = np.average(istar_vir['age', 'Gyr'], weights=mem_rband)
+    result['t50_mem'] = calc_tform(istar_vir, mem_rband, ratio=0.5)
+    result['t90_mem'] = calc_tform(istar_vir, mem_rband, ratio=0.9)
     radiis = [result['r50m'], result['r90m'], result['r50r'], result['r90r'], result['r']]
     for radii, rname in zip(radiis, category):
-        cut_star, cutind = cut_sphere(istar_vir, result['x'], result['y'], result['z'], radii, return_index=True)
+        cut_star = cut_sphere(istar_vir, result['x'], result['y'], result['z'], radii)
         rband = measure_luminosity(cut_star, 'SDSS_r', model='cb07')
         result[f'SFR_{rname}'] = np.sum(cut_star['m', 'Msol'][cut_star['age', 'Myr'] < 100]) / 1e8
         result[f'u_{rname}'] = measure_luminosity(cut_star, 'SDSS_u', model='cb07', total=True)
@@ -464,8 +465,8 @@ def make_udg(host:int, istar_vir:uri.Particle, idm_vir:uri.Particle, icell_vir:u
         result[f'ager_{rname}'] = np.average(cut_star['age', 'Gyr'], weights=rband)
         result[f't50_{rname}'] = calc_tform(cut_star, rband, ratio=0.5)
         result[f't90_{rname}'] = calc_tform(cut_star, rband, ratio=0.9)
-        cut_gas = cut_sphere(icell, result['x'], result['y'], result['z'], radii)
-        cut_dm = cut_sphere(idm, result['x'], result['y'], result['z'], radii)
+        cut_gas = cut_sphere(icell_vir, result['x'], result['y'], result['z'], radii)
+        cut_dm = cut_sphere(idm_vir, result['x'], result['y'], result['z'], radii)
         result[f'mgas_{rname}'] = np.sum(cut_gas['m', 'Msol'])
         coldind = cut_gas['T', 'K'] < 1e4
         result[f'mcold_{rname}'] = np.sum(cut_gas['m', 'Msol'][coldind])
@@ -495,7 +496,7 @@ if(not 'h' in filedone):
         cell = uri.Cell(pklload(f"{database}/parts/nh_cell_{key:04d}.pickle"), snap)
 
         newsats = np.copy(sats); newreal = np.copy(real)
-        for i,dink in enumerate(dinks):
+        for i,dink in tqdm( enumerate(dinks),total=len(dinks),desc="Find UDG candidiates" ):
             sub = subs[subs['id'] == dink][0]
             if(sub['mstar'] < 6e5): continue
 
@@ -506,7 +507,8 @@ if(not 'h' in filedone):
             gcands = igals[insides]
             if(len(gcands)==0):
                 # Truly No gals in this sub
-                if(len(star)>300):
+                nstar = len( pklload(f"{database}/parts/insub/nh_star_{key:04d}_{dink:07d}.pickle") )
+                if(nstar>300):
                     LG[key]['UDG'].append(dink)   # <-------------- Find UDG candidates!
                 continue
             elif(len(gcands)==1):
@@ -542,19 +544,27 @@ if(not 'h' in filedone):
                 newreal[hwhere]['state'] = 'pair'
 
         if(len(LG[key]['UDG']) > 0):
-            for udghostid in LG[key]['UDG']:
+            count = 0
+            for udghostid in tqdm( LG[key]['UDG'],total=len(LG[key]['UDG']),desc="Add UDG catalog" ):
                 udghost = subs[subs['id'] == udghostid][0]
-
-                istar_vir = cut_sphere(star, udghost['x'], udghost['y'], udghost['z'], udghost['rvir'])
+                fname = f"{database}/parts/insub/nh_star_{key:04d}_{udghostid:07d}.pickle"
+                if(os.path.exists(fname)): count+=1
+                istar = uri.Particle(pklload(fname), snap) if(os.path.exists(fname)) else star
+                istar_vir = cut_sphere(istar, udghost['x'], udghost['y'], udghost['z'], udghost['rvir'])
                 if(len(istar_vir)>=100):
-                    idm_vir = cut_sphere(dm, udghost['x'], udghost['y'], udghost['z'], udghost['rvir'])
+                    fname = f"{database}/parts/insub/nh_dm_{key:04d}_{udghostid:07d}.pickle"
+                    idm = uri.Particle(pklload(fname), snap) if(os.path.exists(fname)) else dm
+                    idm_vir = cut_sphere(idm, udghost['x'], udghost['y'], udghost['z'], udghost['rvir'])
+                    fname = f"{database}/parts/insub/nh_cell_{key:04d}_{udghostid:07d}.pickle"
+                    icell = uri.Cell(pklload(fname), snap) if(os.path.exists(fname)) else cell
                     icell_vir = cut_sphere(cell, udghost['x'], udghost['y'], udghost['z'], udghost['rvir'])
-                    udg = make_udg(udghost, istar_vir:uri.Particle, idm_vir:uri.Particle, icell_vir:uri.Cell)
+                    udg = make_udg(udghost, istar_vir, idm_vir, icell_vir)
                     
                     newsats = np.append(newsats, udg)
                     hwhere = np.where(newreal['hid'] == udghost['id'])[0][0]
                     newreal[hwhere]['gid'] = udg['id']
                     newreal[hwhere]['state'] = 'upair'
+            print(count, len(LG[key]['UDG']))
         
         LG[key]['sats'] = newsats
         LG[key]['real'] = newreal[newreal['state'] != 'ban']
