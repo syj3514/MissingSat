@@ -6,7 +6,11 @@ else:
     mod = int(argv[1])
 print(mod)
 
+database = f"/home/jeon/MissingSat/database"
+# database = f"/gem_home/jeon/MissingSat/database"
 
+ncpu=32
+memory=None
 
 from tqdm import tqdm
 import matplotlib.pyplot as plt # type: module
@@ -16,6 +20,7 @@ from matplotlib.colors import Normalize
 
 import numpy as np
 import os, glob
+os.nice(19)
 import time
 import warnings
 
@@ -26,6 +31,7 @@ from rur.sci.geometry import get_angles, euler_angle
 from rur.utool import rotate_data
 from scipy.ndimage import gaussian_filter
 uri.timer.verbose=1
+import atexit, signal
 # from rur.sci.kinematics import f_getpot
 
 from icl_IO import mode2repo, pklsave, pklload
@@ -34,9 +40,9 @@ from icl_numba import large_isin, large_isind, isin
 from icl_draw import drawsnap, add_scalebar, addtext, MakeSub_nolabel, label_to_in, fancy_axis, circle
 import argparse, subprocess
 from importlib import reload
-import cmasher as cmr
+# import cmasher as cmr
 from copy import deepcopy
-from multiprocessing import Pool, shared_memory
+from multiprocessing import Pool, shared_memory, Value
 
 mode = 'nh'
 iout = 1026
@@ -47,10 +53,8 @@ snaps.read_iout_avail()
 nout = snaps.iout_avail['iout']
 gals = uhmi.HaloMaker.load(snap, galaxy=True, double_precision=dp)
 hals = uhmi.HaloMaker.load(snap, galaxy=False, double_precision=dp)
-database = f"/home/jeon/MissingSat/database"
 
 from common_func import *
-
 
 LG = pklload(f"{database}/LG")
 allsubs = None
@@ -94,10 +98,15 @@ else:
         halos['index'][iout] = indicies   
     pklsave(halos, f"{database}/halo_dict.pickle")
 
+keys = list(halos['index'].keys())
+for key in keys:
+    if((key%10 != mod)):
+        del halos['index'][key]
+        del halos['catalog'][key]
 
 
 def _make_sub(ith, address, shape, dtype):
-    global ihals, isnap
+    global ihals, isnap, globalbox, reft, refn
 
     exist = shared_memory.SharedMemory(name=address)
     newsubs = np.ndarray(shape=shape, dtype=dtype, buffer=exist.buf)
@@ -107,41 +116,45 @@ def _make_sub(ith, address, shape, dtype):
     # 'mdm', 'mstar', 'mcold', 'mcell', 
     # 'mdm_vir', 'mstar_vir', 'mcell_vir', 'mcold_vir'
     #--------------------------------------------------------------
-    isnap.set_box_halo(ihal, 1, radius_name='r')
-    isnap.get_part(nthread=1, target_fields=['x','y','z','m','epoch','id'])
-    table = isnap.part['star']
-    if(len(table)>0):
-        table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['r'])
-        if(len(table)>0):
-            newsubs['mstar'][ith] = np.sum(table['m','Msol'])
-            table_vir = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'])
-            if(len(table_vir)>0):
-                newsubs['mstar_vir'][ith] = np.sum(table_vir['m','Msol'])
-    table = isnap.get_cell(nthread=1, target_fields=['x','y','z','rho','P'])#,'level'])
+    assert np.array_equal(isnap.box, globalbox), f"{isnap.box} != {globalbox}"
+    ibox = np.array([[ihal['x']-ihal['r'], ihal['x']+ihal['r']],
+                        [ihal['y']-ihal['r'], ihal['y']+ihal['r']],
+                        [ihal['z']-ihal['r'], ihal['z']+ihal['r']]])
+    table = isnap.get_cell_instant(box=ibox, nthread=1, target_fields=['x','y','z','rho','P'])
     table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['r'])
     if(len(table)>0):
         newsubs['mcell'][ith] = np.sum(table['m','Msol'])
         ctable = table[table['T','K']<2e4]
         if(len(ctable)>0):
             newsubs['mcold'][ith] = np.sum(ctable['m','Msol'])
-        table_vir = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'])
-        if(len(table_vir)>0):
-            newsubs['mcell_vir'][ith] = np.sum(table_vir['m','Msol'])
-            ctable_vir = table_vir[table_vir['T','K']<2e4]
-            if(len(ctable_vir)>0):
-                newsubs['mcold_vir'][ith] = np.sum(ctable_vir['m','Msol'])
-    table = isnap.part['dm']
-    table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['r'])
-    newsubs['mdm'][ith] = np.sum(table['m','Msol'])
-    table_vir = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'])
-    newsubs['mdm_vir'][ith] = np.sum(table_vir['m','Msol'])
-    del table_vir
+        table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'])
+        if(len(table)>0):
+            newsubs['mcell_vir'][ith] = np.sum(table['m','Msol'])
+            ctable = table[table['T','K']<2e4]
+            if(len(ctable)>0):
+                newsubs['mcold_vir'][ith] = np.sum(ctable['m','Msol'])
+
+
+    part = isnap.get_part_instant(box=ibox, nthread=1, target_fields=['x','y','z','m','epoch','id'])
+    table = part['star']
+    if(len(table)>0):
+        table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['r'])
+        if(len(table)>0):
+            newsubs['mstar'][ith] = np.sum(table['m','Msol'])
+            table = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'])
+            if(len(table)>0):
+                newsubs['mstar_vir'][ith] = np.sum(table['m','Msol'])
+    del table
+    part = part['dm']
+    part = cut_sphere(part, ihal['x'], ihal['y'], ihal['z'], ihal['r'])
+    
 
     #--------------------------------------------------------------
     # 'r10_mem', 'r50_mem', 'r90_mem', 'r10_vir', 'r50_vir', 'r90_vir', 'r10_max', 'r50_max', 'r90_max', 
     #--------------------------------------------------------------
-    all_dist = distance(ihal, table); argsort = np.argsort(all_dist)
-    all_dist = all_dist[argsort]; all_mass = table['m'][argsort]
+    all_dist = distance(ihal, part); argsort = np.argsort(all_dist)
+    part=part[argsort]; all_dist = all_dist[argsort]; all_mass = part['m']
+    newsubs['mdm'][ith] = np.sum(all_mass)
     memdm = uhmi.HaloMaker.read_member_part(isnap, ihal['id'], galaxy=False, target_fields=['x','y','z','m'])
     mem_dist = distance(ihal, memdm); argsort = np.argsort(mem_dist)
     mem_dist = mem_dist[argsort]; mem_mass = memdm['m'][argsort]
@@ -154,18 +167,38 @@ def _make_sub(ith, address, shape, dtype):
     newsubs['r10_max'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.1)
     newsubs['r50_max'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.5)
     newsubs['r90_max'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.9)
-    _, ind = cut_sphere(table, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'], return_index=True)
-    all_dist = all_dist[ind]; all_mass = table['m'][ind]
+    _, ind = cut_sphere(part, ihal['x'], ihal['y'], ihal['z'], ihal['rvir'], return_index=True)
+    all_dist = all_dist[ind]; all_mass = all_mass[ind]
+    del part, ind
+    newsubs['mdm_vir'][ith] = np.sum(all_mass)
     newsubs['r10_vir'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.1)
     newsubs['r50_vir'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.5)
     newsubs['r90_vir'][ith] = calc_rhalf_sorted(all_dist, all_mass, ratio=0.9)
 
+    refn.value += 1
+    if(refn.value%500==0)&(refn.value>0):
+        print(f" > {refn.value}/{len(newsubs)} {time.time()-reft.value:.2f} sec (ETA: {(len(newsubs)-refn.value)*(time.time()-reft.value)/refn.value/60:.2f} min)")
 
 
-database = f"/home/jeon/MissingSat/database"
+
 assert not os.path.exists(f"{database}/main_prog/mod{mod}.pickle")
 pklsave(["warning"], f"{database}/main_prog/mod{mod}.pickle")
 
+
+def flush(msg=False, parent=''):
+    global memory
+    if(msg): print(f"{parent} Clearing memory")
+    print(f"\tUnlink `{memory.name}`")
+    memory.close()
+    memory.unlink()
+
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+def terminate(self, signum):
+    flush(msg=True, parent=f'[Signal{signum}]')
+    atexit.unregister(flush)
+    exit(0)
 
 
 cursor = 0
@@ -183,6 +216,7 @@ for iout in np.unique(tree['timestep'])[::-1]:
     y1 = np.min(ihals['y']-ihals['r']); y2 = np.max(ihals['y']+ihals['r'])
     z1 = np.min(ihals['z']-ihals['r']); z2 = np.max(ihals['z']+ihals['r'])
     isnap.box = np.array([[x1,x2],[y1,y2],[z1,z2]])
+    globalbox = np.array([[x1,x2],[y1,y2],[z1,z2]])
     uri.timer.verbose=1
     isnap.get_cell(nthread=40, target_fields=['x','y','z','rho','P'], exact_box=False, domain_slicing=False)
     isnap.get_part(nthread=40, target_fields=['x','y','z','m','epoch','id'], exact_box=False, domain_slicing=False)
@@ -190,6 +224,9 @@ for iout in np.unique(tree['timestep'])[::-1]:
 
     #--------------------------------------------------------------
     #--------------------------------------------------------------
+    atexit.register(flush)
+    signal.signal(signal.SIGINT, terminate)
+    signal.signal(signal.SIGPIPE, terminate)
     newdtype = np.dtype( dtype.descr + [('lastid', '<i4'),('give_score', '<f8'), ('take_score', '<f8')] )
     newsubs = np.zeros(len(allsubs), dtype=newdtype)
     memory = shared_memory.SharedMemory(create=True, size=newsubs.nbytes)
@@ -215,17 +252,21 @@ for iout in np.unique(tree['timestep'])[::-1]:
     newsubs['give_score'] = itree['give_score']
     newsubs['take_score'] = itree['take_score']
     
+    reft = Value('f', 0); reft.value = time.time()
+    refn = Value('i', 0)
     uri.timer.verbose=0
-    with Pool(processes=32) as pool:
+    print(f"[IOUT {iout:05d}]")
+    with Pool(processes=ncpu) as pool:
         async_result = [pool.apply_async(_make_sub, (ith, memory.name, newsubs.shape, newdtype)) for ith in range(nsub)]
-        iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
+        # iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
+        iterobj = async_result
         for r in iterobj:
             r.get()
 
     isnap.clear()
     README = "`sub`, `dink`, `Host`, `r200kpc`, `m200`, `r200` are missed!"
     pklsave((newsubs, README), f"{database}/main_prog/subhalos_{iout:05d}.pickle")
-    memory.close()
-    memory.unlink()
+    print(f"`{database}/main_prog/subhalos_{iout:05d}.pickle` save done\n\n\n")
+    flush(msg=True)
     del newsubs
     cursor += nsub
