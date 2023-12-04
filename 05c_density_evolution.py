@@ -69,6 +69,7 @@ from importlib import reload
 # import cmasher as cmr
 from copy import deepcopy
 from multiprocessing import Pool, shared_memory, Value
+from functools import partial
 
 mode = 'nh'
 iout = 1026
@@ -204,8 +205,10 @@ def _calc_virial(ith, address, shape, dtype):
     r200 = 1000
     factor = 0.5
 
+    reftime = time.time()
     while(ihal['r']*factor < r200):
-        if(factor>1): print(f'Enlarge the box size! {factor}->{factor*2}')
+        if(factor>=1): print(f'R200({r200:.6f}) vs Range({factor*ihal["r"]:.6f}): Enlarge the box size! {factor}->{factor*2}')
+        if(factor>32): raise ValueError("Fail to Enlarge the box size!")
         factor *= 2
         ibox = _ibox(ihal, factor=factor)
         star = snap_star.get_part_instant(box=ibox, pname='star', target_fields=['x','y','z','m'], nthread=1)
@@ -220,14 +223,15 @@ def _calc_virial(ith, address, shape, dtype):
 
         
         r200kpc, m200, r200 = calc_virial(ihal['x'], ihal['y'], ihal['z'], factor*ihal['r']/snap_star.unit['kpc'], pos_code, mass_msol, params)
-
+    elapse = time.time() - reftime
     virials['r200kpc'][ith] = r200kpc
     virials['m200'][ith] = m200
     virials['r200'][ith] = r200
 
     refn.value += 1
-    if(refn.value%100==0)&(refn.value>0):
-        print(f" > {refn.value}/{len(virials)} {time.time()-reft.value:.2f} sec (ETA: {(len(virials)-refn.value)*(time.time()-reft.value)/refn.value/60:.2f} min)")
+    # if(refn.value%100==0)&(refn.value>0):
+    # if(elapse>10): print(f" > {refn.value}/{len(virials)} ({ith} & {factor}) [{pos_code.shape} Elap {elapse} sec]{time.time()-reft.value:.2f} sec (ETA: {(len(virials)-refn.value)*(time.time()-reft.value)/refn.value/60:.2f} min)")
+    print(f" > {refn.value}/{len(virials)} ({ith} & {factor}) [{pos_code.shape} Elap {elapse:.2f} sec]{time.time()-reft.value:.2f} sec (ETA: {(len(virials)-refn.value)*(time.time()-reft.value)/refn.value/60:.2f} min)")
 
 assert not os.path.exists(f"{database}/main_prog/mod{mod}.pickle")
 pklsave(["warning"], f"{database}/main_prog/mod{mod}.pickle")
@@ -263,15 +267,24 @@ for iout in keys[::-1]:
     uri.timer.verbose=0
     print(f"[IOUT {iout:05d}]")
 
+    __calc_virial = partial(_calc_virial, address=memory.name, shape=virials.shape, dtype=virials.dtype)
+
+    ref = time.time()
+    for ith in range(800):
+        __calc_virial(ith)
+    print("###", time.time()-ref)
+    ref = time.time()
     with Pool(processes=ncpu) as pool:
-        async_result = [pool.apply_async(_calc_virial, (ith, memory.name, virials.shape, virials.dtype)) for ith in range(nhals)]
-        iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
+        # async_result = [pool.apply_async(_calc_virial, (ith, memory.name, virials.shape, virials.dtype)) for ith in range(nhals)]
+        [result for result in pool.imap_unordered(__calc_virial, range(800))]
+        # iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
         # iterobj = async_result
-        for r in iterobj:
-            r.get()
+        # [r.get() for r in iterobj]
+    print("###", time.time()-ref)
     snap_star.clear()
     snap_dm.clear()
     snap_cell.clear()
+    stop()
     pklsave(virials, f"{database}/main_prog/virials_{iout:05d}.pickle")
     print(f"`{database}/main_prog/virials_{iout:05d}.pickle` save done\n\n\n")
     flush(msg=True)
