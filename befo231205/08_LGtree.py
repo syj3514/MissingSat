@@ -311,8 +311,8 @@ for i, iout in enumerate(nout[::-1]):
             'halo_x', 'halo_y', 'halo_z', 'halo_vx', 'halo_vy', 'halo_vz', 'halo_mvir', 'halo_rvir'
             'fcontam', 'dist'
             '''
-            cands = ihals[ihals['rvir'] > table['r']]
-            cands = cut_sphere(cands, table['x'], table['y'], table['z'], table['r'])
+            tmp = ihals[ihals['rvir'] > table['r']]
+            cands = cut_sphere(tmp, table['x'], table['y'], table['z'], table['r'])
             if(len(cands)>0):
                 dists = distance(cands, table)
                 mask = dists < cands['rvir']
@@ -322,6 +322,11 @@ for i, iout in enumerate(nout[::-1]):
                     mask = dists < (cands['rvir']-table['r'])
                     if(True in mask):
                         cands = cands[mask]
+            else:
+                factor=2
+                while len(cands)==0:
+                    cands = cut_sphere(tmp, table['x'], table['y'], table['z'], table['r']*factor)
+                    factor *= 2
             ihal = cands[np.argmax(cands['mvir'])]
             for iname in table.dtype.names:
                 if(iname[:5]=='halo_'):
@@ -336,17 +341,20 @@ for i, iout in enumerate(nout[::-1]):
         #------------------------------------------
         '''
         'r200', 'm200', 'r200_code', 'm_star_200', 'm_gas_200', 'fcontam_200'
-        '''       
-        ibox = np.array([[np.min(ihals['x'] - 3*ihals['r']), np.max(ihals['x'] + 3*ihals['r'])],
-                        [np.min(ihals['y'] - 3*ihals['r']), np.max(ihals['y'] + 3*ihals['r'])],
-                        [np.min(ihals['z'] - 3*ihals['r']), np.max(ihals['z'] + 3*ihals['r'])]])
+        '''
+        cpulists = []
+        for key in keys:
+            ihal = TREE[key][-1]
+            ibox = _ibox(ihal, factor=4)
+            cpulists.append( snap_star.get_involved_cpu(box=ibox) )
+        cpulists = np.unique(np.hstack(cpulists))
         virials = np.zeros( len(keys), dtype=[('key','<i4'),
             ("r200","<f8"), ("m200","<f8"), ("r200_code","<f8"), ("m_star_200","<f8"), ("m_gas_200","<f8"), ("fcontam_200","<f8")
             ])
         uri.timer.verbose=1
-        snap_star.get_part(pname='star', target_fields=['x','y','z','m'], nthread=ncpu, box=ibox, exact_box=False, domain_slicing=False)
-        snap_dm.get_part(pname='dm', target_fields=['x','y','z','m'], nthread=ncpu, box=ibox, exact_box=False, domain_slicing=False)
-        snap_cell.get_cell(target_fields=['x','y','z','rho', 'level'], nthread=ncpu, box=ibox, exact_box=False, domain_slicing=False)
+        snap_star.get_part(pname='star', target_fields=['x','y','z','m'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
+        snap_dm.get_part(pname='dm', target_fields=['x','y','z','m'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
+        snap_cell.get_cell(target_fields=['x','y','z','rho', 'level'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
         uri.timer.verbose=0
 
         atexit.register(flush)

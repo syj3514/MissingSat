@@ -4,6 +4,25 @@ from icl_tool import *
 from icl_IO import mode2repo, pklsave, pklload
 from icl_draw import fancy_axes
 import os, glob
+from IPython import get_ipython
+
+def _ibox(h, factor=1, rname='r'):
+    return np.array([[h['x']-factor*h[rname], h['x']+factor*h[rname]],
+                        [h['y']-factor*h[rname], h['y']+factor*h[rname]],
+                        [h['z']-factor*h[rname], h['z']+factor*h[rname]]])
+def type_of_script():
+    """
+    Detects and returns the type of python kernel
+    :return: string 'jupyter' or 'ipython' or 'terminal'
+    """
+    try:
+        ipy_str = str(type(get_ipython()))
+        if 'zmqshell' in ipy_str:
+            return 'jupyter'
+        if 'terminal' in ipy_str:
+            return 'ipython'
+    except:
+        return 'terminal'
 
 def showall(key, subid, LG=None):
     if(LG is None):
