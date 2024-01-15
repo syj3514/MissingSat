@@ -1,4 +1,4 @@
-database = f"/home/jeon/MissingSat/database"
+_database = f"/home/jeon/MissingSat/database"
 import matplotlib.pyplot as plt
 from icl_tool import *
 from icl_IO import mode2repo, pklsave, pklload
@@ -26,7 +26,7 @@ def type_of_script():
 
 def showall(key, subid, LG=None):
     if(LG is None):
-        LG = pklload(f"{database}/LG")
+        LG = pklload(f"{_database}/LG")
 
     fig, axes = fancy_axes(aspect='equal', ncols=2, dpi=400)
     fig.set_facecolor("k")
@@ -54,10 +54,10 @@ def draw_zoomin(key, subid, axes, LGkwargs={}, subkwargs={}):
 def load_LGimg(key, ax=None, box=None, mode='S'):
     modes = {'S':'star', 'D':'dm', 'G':'cell', 'SDG':'all', 'all':'all'}
     suffix = modes[mode]
-    path = f"{database}/photo/00_LG_image/NH_{key:04d}_{suffix}.png"
+    path = f"{_database}/photo/00_LG_image/NH_{key:04d}_{suffix}.png"
     img = plt.imread(path)
     if(box is None):
-        LG = pklload(f"{database}/LG")
+        LG = pklload(f"{_database}/LG")
         box = LG[key]['box']
     if(ax is not None): ax.imshow(img, extent=box[:2].flatten())
     return img, box
@@ -65,7 +65,7 @@ def load_LGimg(key, ax=None, box=None, mode='S'):
 def load_subimg(subid, ax=None, clean=False, mode='SDG'):
     name1 = 'clean' if(clean) else 'info'
     name2 = 'All' if(mode=='SDG')or(mode=='all') else mode
-    path = f"{database}/photo/gallery/{name1}/{name2}/NH_sub{subid:07d}.png"
+    path = f"{_database}/photo/gallery/{name1}/{name2}/NH_sub{subid:07d}.png"
     img = plt.imread(path)
     box = read_subbox(subid)
     if(ax is not None): ax.imshow(img, extent=box[:2].flatten())
@@ -78,7 +78,7 @@ def write_subbox(subid, key=None, newpos=None):
         ("y1", float),("y2", float),
         ("z1", float),("z2", float),
         ]
-    path = f"{database}/parts/insub/boxes.pickle"
+    path = f"{_database}/parts/insub/boxes.pickle"
     boxes = None
     if(os.path.exists(path)):
         boxes = pklload(path)
@@ -91,20 +91,20 @@ def write_subbox(subid, key=None, newpos=None):
     if(newpos is None):
         
         if(key is None):
-            flist = os.listdir(f"{database}/parts/insub")
+            flist = os.listdir(f"{_database}/parts/insub")
             flist = [f for f in flist if(f.endswith(f'{subid:07d}.pickle'))][0]
             key = int(flist.split('_')[2])
 
-        dm = pklload(f"{database}/parts/insub/nh_dm_{key:04d}_{subid:07d}.pickle")
+        dm = pklload(f"{_database}/parts/insub/nh_dm_{key:04d}_{subid:07d}.pickle")
         x1 = dm['x'].min(); x2 = dm['x'].max()
         y1 = dm['y'].min(); y2 = dm['y'].max()
         z1 = dm['z'].min(); z2 = dm['z'].max()
-        star = pklload(f"{database}/parts/insub/nh_star_{key:04d}_{subid:07d}.pickle")
+        star = pklload(f"{_database}/parts/insub/nh_star_{key:04d}_{subid:07d}.pickle")
         if(len(star)>0):
             x1 = min(x1, star['x'].min()); x2 = max(x2, star['x'].max())
             y1 = min(y1, star['y'].min()); y2 = max(y2, star['y'].max())
             z1 = min(z1, star['z'].min()); z2 = max(z2, star['z'].max())
-        cell = pklload(f"{database}/parts/insub/nh_cell_{key:04d}_{subid:07d}.pickle")
+        cell = pklload(f"{_database}/parts/insub/nh_cell_{key:04d}_{subid:07d}.pickle")
         if(len(cell)>0):
             x1 = min(x1, cell['x'].min()); x2 = max(x2, cell['x'].max())
             y1 = min(y1, cell['y'].min()); y2 = max(y2, cell['y'].max())
@@ -120,7 +120,7 @@ def write_subbox(subid, key=None, newpos=None):
     return boxes
 
 def read_subbox(subid):
-    path = f"{database}/parts/insub/boxes.pickle"
+    path = f"{_database}/parts/insub/boxes.pickle"
     boxes = write_subbox(subid)
 
     where = np.where(boxes['subid']==subid)[0][0]
