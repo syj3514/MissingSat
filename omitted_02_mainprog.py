@@ -90,10 +90,16 @@ result[:nsub]['take_score'] = 1
 
 cursor = nsub
 
-
+if(os.path.exists(f"{database}/02_main_progenitors.tmp.pickle")):
+    lastout, result = pklload(f"{database}/02_main_progenitors.tmp.pickle")
+else:
+    pklsave((iout,result), f"{database}/02_main_progenitors.tmp.pickle")
+    lastout = iout
+    cursor = np.where(result['id']==0)[0][0]
 
 uri.timer.verbose=0
 for pout in tqdm(iouts[1:]):
+    if(pout >= lastout): continue
     psnap = snaps.get_snap(pout)
     phals, ppids = uhmi.HaloMaker.load(psnap, galaxy=False, load_parts=True)
     cparts = phals['nparts']; cparts = np.cumsum(cparts); cparts = np.hstack((0, cparts))
@@ -135,4 +141,6 @@ for pout in tqdm(iouts[1:]):
         cursor += 1
     psnap.clear()
     del snaps.snaps[pout]
-pklsave(result, f"{database}/02_main_progenitors.pickle")
+    pklsave((pout,result), f"{database}/02_main_progenitors.tmp.pickle", overwrite=True)
+    lastout = pout
+pklsave(result, f"{database}/02_main_progenitors.pickle", overwrite=True)

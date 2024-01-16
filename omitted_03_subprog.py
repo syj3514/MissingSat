@@ -153,7 +153,7 @@ def _make_sub(ith, address, shape, dtype):
     # 'r10_mem', 'r50_mem', 'r90_mem', 'r10_vir', 'r50_vir', 'r90_vir', 'r10_max', 'r50_max', 'r90_max', 
     #--------------------------------------------------------------
     all_dist = distance(ihal, part); argsort = np.argsort(all_dist)
-    part=part[argsort]; all_dist = all_dist[argsort]; all_mass = part['m']
+    part=part[argsort]; all_dist = all_dist[argsort]; all_mass = part['m','Msol']
     newsubs['mdm'][ith] = np.sum(all_mass)
     memdm = uhmi.HaloMaker.read_member_part(isnap, ihal['id'], galaxy=False, target_fields=['x','y','z','m'])
     mem_dist = distance(ihal, memdm); argsort = np.argsort(mem_dist)

@@ -1,5 +1,5 @@
 import argparse
-database = f"/home/jeon/MissingSat/database"
+database = f"/home/jeon/MissingSat/database/nh"
 # database = f"/gem_home/jeon/MissingSat/database"
 
 print("ex: $ python3 08_LGtree.py [--ncpu 32] [--mod 0]")
@@ -82,8 +82,10 @@ def flush(msg=False, parent=''):
     global memory
     if(msg): print(f"{parent} Clearing memory")
     print(f"\tUnlink `{memory.name}`")
-    memory.close()
-    memory.unlink()
+    try:
+        memory.close()
+        memory.unlink()
+    except: pass
 
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
@@ -193,43 +195,47 @@ def calc_virial(cx,cy,cz, rmax_pkpc, pos_code, m_msol, ns, params):
     return rvir, mvir, rvir_code, mstar200, mgas200, fcontam200
 
 def _calc_virial(key, address, shape, dtype):
-    global TREE, snap_star, snap_dm, snap_cell, reft, refn, params, keys
+    global TREE, snap_star, snap_dm, snap_cell, reft, refn, params, keys, donelist
+    if(key in donelist):
+        refn.value += 1
+    else:
+        exist = shared_memory.SharedMemory(name=address)
+        virials = np.ndarray(shape=shape, dtype=dtype, buffer=exist.buf)
 
-    exist = shared_memory.SharedMemory(name=address)
-    virials = np.ndarray(shape=shape, dtype=dtype, buffer=exist.buf)
+        branch = TREE[key]
+        ihal = branch[-1]
+        ith = np.where(keys == key)[0][0]
+        r200 = 1000
+        factor = 0.75
 
-    branch = TREE[key]
-    ihal = branch[-1]
-    ith = np.where(keys == key)[0][0]
-    r200 = 1000
-    factor = 0.75
+        while(ihal['halo_rvir']*factor < r200):
+            if(factor>1): print(f'Enlarge the box size! {factor}->{factor*2}')
+            factor *= 2
+            ibox = _ibox(ihal, factor=factor)
+            star = snap_star.get_part_instant(box=ibox, pname='star', target_fields=['x','y','z','m'], nthread=1)
+            dm = snap_dm.get_part_instant(box=ibox, pname='dm', target_fields=['x','y','z','m'], nthread=1)
+            cell = snap_cell.get_cell_instant(box=ibox, target_fields=['x','y','z','rho', 'level'], nthread=1)
 
-    while(ihal['halo_rvir']*factor < r200):
-        if(factor>1): print(f'Enlarge the box size! {factor}->{factor*2}')
-        factor *= 2
-        ibox = _ibox(ihal, factor=factor)
-        star = snap_star.get_part_instant(box=ibox, pname='star', target_fields=['x','y','z','m'], nthread=1)
-        dm = snap_dm.get_part_instant(box=ibox, pname='dm', target_fields=['x','y','z','m'], nthread=1)
-        cell = snap_cell.get_cell_instant(box=ibox, target_fields=['x','y','z','rho', 'level'], nthread=1)
+            pos_star = star['pos']; mass_star = star['m','Msol']
+            pos_dm = dm['pos']; mass_dm = dm['m','Msol']
+            pos_cell = cell['pos']; mass_cell = cell['m','Msol']
+            pos_code = np.vstack( (pos_star, pos_dm, pos_cell) )
+            mass_msol = np.hstack( (mass_star, mass_dm, mass_cell) )
+            ns = [len(pos_star), len(pos_dm), len(pos_cell)]
+            if(ns[0]+ns[1] == 0)or(ns[1] == 0):
+                print(f"! Nstar={ns[0]}, Ndm={ns[1]} !")
+                r200 = 1000
+            else:
+                r200kpc, m200, r200, mstar200, mgas200, fcontam200 = calc_virial(ihal['x'], ihal['y'], ihal['z'], factor*ihal['halo_rvir']/snap_star.unit['kpc'], pos_code, mass_msol,ns, params)
 
-        pos_star = star['pos']; mass_star = star['m','Msol']
-        pos_dm = dm['pos']; mass_dm = dm['m','Msol']
-        pos_cell = cell['pos']; mass_cell = cell['m','Msol']
-        pos_code = np.vstack( (pos_star, pos_dm, pos_cell) )
-        mass_msol = np.hstack( (mass_star, mass_dm, mass_cell) )
-        ns = [len(pos_star), len(pos_dm), len(pos_cell)]
+        virials['r200'][ith] = r200kpc
+        virials['m200'][ith] = m200
+        virials['r200_code'][ith] = r200
+        virials['m_star_200'][ith] = mstar200
+        virials['m_gas_200'][ith] = mgas200
+        virials['fcontam_200'][ith] = fcontam200
 
-        
-        r200kpc, m200, r200, mstar200, mgas200, fcontam200 = calc_virial(ihal['x'], ihal['y'], ihal['z'], factor*ihal['halo_rvir']/snap_star.unit['kpc'], pos_code, mass_msol,ns, params)
-
-    virials['r200'][ith] = r200kpc
-    virials['m200'][ith] = m200
-    virials['r200_code'][ith] = r200
-    virials['m_star_200'][ith] = mstar200
-    virials['m_gas_200'][ith] = mgas200
-    virials['fcontam_200'][ith] = fcontam200
-
-    refn.value += 1
+        refn.value += 1
     if(refn.value%100==0)&(refn.value>0):
         print(f" > {refn.value}/{len(virials)} {time.time()-reft.value:.2f} sec (ETA: {(len(virials)-refn.value)*(time.time()-reft.value)/refn.value/60:.2f} min)")
 
@@ -239,14 +245,24 @@ for key in keys:
     TREE[key] = None
 if(os.path.exists(fname)):
     TREE = pklload(fname)
+    for key in keys:
+        nan = np.isnan(TREE[key]['fcontam_200'])
+        if(True in nan):
+            TREE[key] = TREE[key][~nan]
 for i, iout in enumerate(nout[::-1]):
     if(iout%10 != mod): continue
+
+    donelist = []
     if(TREE[keys[-1]] is not None):
-        if(iout in TREE[keys[-1]]['timestep']): continue
-    print(f"[{iout:04d}]")
+        for key in keys:
+            if(iout in TREE[key]['timestep']):
+                donelist.append(key)
+    if(len(donelist) == len(keys)): continue
+    print(f"\n[{iout:04d}] {donelist}")
     if(iout==1026):
         for key in tqdm( keys ):
             if(not LG[key]['isLG']): continue
+            if(key in donelist): continue
             BGG = LG[key]['BGG']
             table = np.zeros(1, dtype=dtype)
             itree = rgtree[key]
@@ -268,12 +284,14 @@ for i, iout in enumerate(nout[::-1]):
         snap_cell = snap_cells.get_snap(iout)
         igals = uhmi.HaloMaker.load(snap_star, galaxy=True)
         ihals = uhmi.HaloMaker.load(snap_star, galaxy=False)
+        if(len(igals)==0)and(len(ihals)==0): continue
         params = {'H0':snap_star.H0,
                 'aexp':snap_star.aexp,
                 'kpc':snap_star.unit['kpc']}
         ihals = ihals[ihals['mcontam'] < ihals['m']]
         for key in tqdm( keys, desc=f"[{iout:04d}] From Catalogs" ):
             if(not LG[key]['isLG']): continue
+            if(key in donelist): continue
             #------------------------------------------
             # From TreeMaker
             #------------------------------------------
@@ -335,6 +353,7 @@ for i, iout in enumerate(nout[::-1]):
             table['fcontam'] = ihal['mcontam']/ihal['m']
             table['dist'] = distance(ihal, table)
             TREE[key] = np.array([table]) if(TREE[key] is None) else np.hstack((TREE[key], table))
+            print(table)
 
         #------------------------------------------
         # From Raw data
@@ -344,6 +363,7 @@ for i, iout in enumerate(nout[::-1]):
         '''
         cpulists = []
         for key in keys:
+            if(key in donelist): continue
             ihal = TREE[key][-1]
             ibox = _ibox(ihal, factor=4)
             cpulists.append( snap_star.get_involved_cpu(box=ibox) )
@@ -351,7 +371,7 @@ for i, iout in enumerate(nout[::-1]):
         virials = np.zeros( len(keys), dtype=[('key','<i4'),
             ("r200","<f8"), ("m200","<f8"), ("r200_code","<f8"), ("m_star_200","<f8"), ("m_gas_200","<f8"), ("fcontam_200","<f8")
             ])
-        uri.timer.verbose=1
+        uri.timer.verbose=0
         snap_star.get_part(pname='star', target_fields=['x','y','z','m'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
         snap_dm.get_part(pname='dm', target_fields=['x','y','z','m'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
         snap_cell.get_cell(target_fields=['x','y','z','rho', 'level'], nthread=ncpu, exact_box=False, domain_slicing=True, cpulist=cpulists)
@@ -368,7 +388,6 @@ for i, iout in enumerate(nout[::-1]):
         reft = Value('f', 0); reft.value = time.time()
         refn = Value('i', 0)
         uri.timer.verbose=0
-        print(f"[IOUT {iout:05d}]")
         with Pool(processes=len(keys)) as pool:
             async_result = [pool.apply_async(_calc_virial, (key, memory.name, virials.shape, virials.dtype)) for key in keys]
             iterobj = tqdm(async_result, total=len(async_result), desc=f"[{iout:04d}] From Raw data")# if(uri.timer.verbose>=1) else async_result
@@ -380,6 +399,7 @@ for i, iout in enumerate(nout[::-1]):
         snap_cell.clear()
 
         for key in keys:
+            if(key in donelist): continue
             TREE[key][-1]['r200'] = virials['r200'][virials['key']==key][0]
             TREE[key][-1]['m200'] = virials['m200'][virials['key']==key][0]
             TREE[key][-1]['r200_code'] = virials['r200_code'][virials['key']==key][0]
@@ -388,3 +408,4 @@ for i, iout in enumerate(nout[::-1]):
             TREE[key][-1]['fcontam_200'] = virials['fcontam_200'][virials['key']==key][0]
         flush(msg=False)
     pklsave(TREE, fname, overwrite=True)
+    print(f"`{fname}` save done")

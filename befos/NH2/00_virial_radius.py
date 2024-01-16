@@ -53,8 +53,10 @@ def flush(msg=False, parent=''):
     global memory
     if(msg): print(f"{parent} Clearing memory")
     print(f"\tUnlink `{memory.name}`")
-    memory.close()
-    memory.unlink()
+    try:
+        memory.close()
+        memory.unlink()
+    except: pass
 
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
