@@ -137,11 +137,14 @@ fnames1 = [fname for fname in fnames1 if(fname.startswith('subhalos'))]
 fnames1.sort(reverse=True)
 
 tmp = pklload(f"{database1}/main_prog/{fnames1[0]}")[0]
+where = np.where(isin(tmp['lastid'], allsubs1['id']))[0]
+tmp = tmp[where]
 trees1 = np.empty(tmp.shape[0]*len(fnames1), dtype=tmp.dtype)
 cursor = 0
 uri.timer.verbose=0
 for fname in tqdm( fnames1 ):
     tmp = pklload(f"{database1}/main_prog/{fname}")[0]
+    tmp = tmp[where]
     trees1[cursor : cursor+len(tmp)] = tmp
     cursor += len(tmp)
 trees1 = trees1[trees1['timestep'] <= iout1]
@@ -181,7 +184,7 @@ for i, sub in tqdm(enumerate(allsubs1), total=len(allsubs1)):
     mbranch = cbranch[(cbranch['mdm_vir'] <= upper)&(cbranch['mdm_vir'] >= lower)&(cbranch['take_score']>0.01)]
     reduced_tree1[sub['id']] = mbranch
 pklsave(reduced_tree1,f"{database1}/reduced_tree.pickle", overwrite=True)
-
+raise ValueError("stop")
 ##########################################################################
 print("NH2")
 tree2 = pklload(f"{database2}/main_progenitors.pickle")

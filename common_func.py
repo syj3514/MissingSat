@@ -24,6 +24,22 @@ def type_of_script():
     except:
         return 'terminal'
 
+def makemovie(fnames, pathout, fps=15):
+    import cv2
+    from tqdm import tqdm
+    frame_array = []
+    for path in tqdm( fnames, desc="Read images..." ): 
+        img = cv2.imread(path)
+        height, width, layers = img.shape
+        size = (width,height)
+        frame_array.append(img)
+    print(f"Size: {size} with {fps} frame/sec")
+    out = cv2.VideoWriter(pathout,cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+    for i in tqdm(range(len(frame_array)), desc="Write output..."):
+        # writing to a image array
+        out.write(frame_array[i])
+    out.release()
+
 def showall(key, subid, LG=None):
     if(LG is None):
         LG = pklload(f"{_database}/LG")
