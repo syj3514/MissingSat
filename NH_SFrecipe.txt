@@ -6,6 +6,11 @@ if(d <= d_gmc):
     * n_gmc=10d0     !1d2 in NH.nml/PHYSICS_PARAMS
     * nCOM = del_star*omega_b*rhoc*(h0/100.)**2/aexp**3*XH/mH
     * del_star=2.D2     ! Minimum overdensity to define ISM
+    * omega_b = 0.0455
+    * rhoc = 1.8800000d-29
+    * h0 = see `output_amr.f90: 442`
+    * XH = X = 0.76
+    * mH = 1.6600000d-24
 else:
     (trgv) Calculate turbulence velocity from the density differences from neighbor cells
         [ (vx_left+vx_self)/(dens_left+dens_self) - (vx_right+vx_self)/(den_right+den_self) ]**2 +

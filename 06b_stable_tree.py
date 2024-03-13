@@ -225,7 +225,7 @@ snap1s.clear()
 # leng = len(allsubs2)
 # fnames = os.listdir(f"/storage7/NH2/halo/")
 # bout = [int(fname[-5:]) for fname in fnames if(fname.startswith("tree_bricks"))]; bout.sort()
-# bout = np.array(bout); bout = bout[bout <= iout1]
+# bout = np.array(bout); bout = bout[bout <= iout2]
 # # print(bout)
 
 # lastids = {}
