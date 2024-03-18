@@ -13,15 +13,15 @@ if(d <= d_gmc):
     * mH = 1.6600000d-24
 else:
     (trgv) Calculate turbulence velocity from the density differences from neighbor cells
-        [ (vx_left+vx_self)/(dens_left+dens_self) - (vx_right+vx_self)/(den_right+den_self) ]**2 +
-        [ (vy_left+vy_self)/(dens_left+dens_self) - (vy_right+vy_self)/(den_right+den_self) ]**2 +
-        [ (vz_left+vz_self)/(dens_left+dens_self) - (vz_right+vz_self)/(den_right+den_self) ]**2 +
-        [ (vx_top+vx_self)/(dens_top+dens_self) - (vx_bottom+vx_self)/(den_bottom+den_self) ]**2 +
-        [ (vy_top+vy_self)/(dens_top+dens_self) - (vy_bottom+vy_self)/(den_bottom+den_self) ]**2 +
-        [ (vz_top+vz_self)/(dens_top+dens_self) - (vz_bottom+vz_self)/(den_bottom+den_self) ]**2 +
-        [ (vx_front+vx_self)/(dens_front+dens_self) - (vx_behind+vx_self)/(den_behind+den_self) ]**2 +
-        [ (vy_front+vy_self)/(dens_front+dens_self) - (vy_behind+vy_self)/(den_behind+den_self) ]**2 +
-        [ (vz_front+vz_self)/(dens_front+dens_self) - (vz_behind+vz_self)/(den_behind+den_self) ]**2 +
+    (div)    [ (vx_left+vx_self)/(dens_left+dens_self) - (vx_right+vx_self)/(den_right+den_self) ]**2 +
+    (cur)    [ (vy_left+vy_self)/(dens_left+dens_self) - (vy_right+vy_self)/(den_right+den_self) ]**2 +
+    (cur)    [ (vz_left+vz_self)/(dens_left+dens_self) - (vz_right+vz_self)/(den_right+den_self) ]**2 +
+    (cur)    [ (vx_top+vx_self)/(dens_top+dens_self) - (vx_bottom+vx_self)/(den_bottom+den_self) ]**2 +
+    (div)    [ (vy_top+vy_self)/(dens_top+dens_self) - (vy_bottom+vy_self)/(den_bottom+den_self) ]**2 +
+    (cur)    [ (vz_top+vz_self)/(dens_top+dens_self) - (vz_bottom+vz_self)/(den_bottom+den_self) ]**2 +
+    (cur)    [ (vx_front+vx_self)/(dens_front+dens_self) - (vx_behind+vx_self)/(den_behind+den_self) ]**2 +
+    (cur)    [ (vy_front+vy_self)/(dens_front+dens_self) - (vy_behind+vy_self)/(den_behind+den_self) ]**2 +
+    (div)    [ (vz_front+vz_self)/(dens_front+dens_self) - (vz_behind+vz_self)/(den_behind+den_self) ]**2 +
     (c_s2) Calculate sound speed from cell temperature
         max( uold(ind_cell(i),5)*(gamma -1.0), smallc**2 )
         * uold(???, 5) <- Pressure

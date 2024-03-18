@@ -1,6 +1,6 @@
 from IPython import get_ipython
 
-
+ncpu=48
 def type_of_script():
     """
     Detects and returns the type of python kernel
@@ -214,12 +214,12 @@ def wmean(vals,ws):
 def cell_calc(target, snap):
     radii = 1
     snap.set_box_halo(target, radii, radius_name='r')
-    snap.get_cell(nthread=16)
+    snap.get_cell(nthread=ncpu)
     maxdx = 1 / 2**np.min(snap.cell['level']-1)
     snap.box[0,0] -= maxdx; snap.box[0,1] += maxdx
     snap.box[1,0] -= maxdx; snap.box[1,1] += maxdx
     snap.box[2,0] -= maxdx; snap.box[2,1] += maxdx
-    snap.get_cell(nthread=16)
+    snap.get_cell(nthread=ncpu)
     allcells = snap.cell
     cells = cut_sphere(allcells, target['x'], target['y'], target['z'], target['r'])
     dtype = cells.dtype.descr + ndtype
@@ -231,9 +231,10 @@ def cell_calc(target, snap):
     if(np.sum(newcells['dense'])==0):
         snap.clear()
         return newcells
-    print(len(allcells),np.sum(newcells['dense']))
+    # print(len(allcells),np.sum(newcells['dense']))
     where = np.where(newcells['dense'])[0]
-    for i, icell in tqdm(zip(where, cells[newcells['dense']]), total=np.sum(newcells['dense'])):
+    # for i, icell in tqdm(zip(where, cells[newcells['dense']]), total=np.sum(newcells['dense'])):
+    for i, icell in zip(where, cells[newcells['dense']]):
         if(not newcells[i]['dense']): continue
         ls,rs,fs,bs,us,ds = get_nbor(icell, allcells, return_nbor=False)
         if(len(ls)==0 or len(rs)==0 or len(fs)==0 or len(bs)==0 or len(us)==0 or len(ds)==0):
@@ -285,7 +286,10 @@ def cell_calc(target, snap):
         mcell = icell['rho'] * dx**3
 
         # The virial parameter
-        alpha0 = 5*(trgv + c_s2)/(np.pi * factG * icell['rho'] * dx**2)
+        if(snap.mode=='nh'):
+            alpha0 = 5*(trgv + c_s2)/(np.pi * factG * icell['rho'] * dx**2)
+        else:
+            alpha0 = 5*trgv/(np.pi * factG * icell['rho'] * dx**2)
 
         # Variance of the logarithmic PDF
         # sigs  = np.log(1.0 + 0.16*mach2)
@@ -296,7 +300,10 @@ def cell_calc(target, snap):
         scrit = np.log(0.067 / theta**2 * alpha0 * trgv/c_s2)
 
         # sigs > scrit -> star formation
-        sfr_ff = e_cts/2*phi_t * np.exp(3/8*sigs) * (2 - erfc( (sigs-scrit)/np.sqrt(2*sigs) ))
+        if(snap.mode=='nh'):
+            sfr_ff = e_cts/2*phi_t * np.exp(3/8*sigs) * (2 - erfc( (sigs-scrit)/np.sqrt(2*sigs) ))
+        else:
+            sfr_ff = eps_star/2*phi_t * np.exp(3/8*sigs) * (2 - erfc( (sigs-scrit)/np.sqrt(2*sigs) ))
 
         # The local free-fall time of the gas
         tstar     = 0.5427 * np.sqrt(1/( factG*icell['rho'] )) # 0.5427 = sqrt(3pi / 32)
@@ -340,47 +347,66 @@ def cell_calc(target, snap):
 ###########################################################
 # Snapshot
 ###########################################################
-for pair in pairs1:
-    iid = pair['id']
-    if(iid<22517): continue
-    try:
-        target = rtree1[iid][-1]
-        tnext = rtree1[iid][-2]
-        print(f"{iid}, {target['mstar_vir']=:}")
-        print(f"{iid}, {tnext['mstar_vir']=:}")
-    except:
+for iout in nout1:
+    if(iout > 150): continue
+    snap = snap1s.get_snap(iout)
+    targets = None
+    for isub in allsubs1:
+        branch = rtree1[isub['id']]
+        if(iout in branch['timestep']):
+            tmp = branch[branch['timestep'] == iout]
+            targets = tmp if targets is None else np.hstack((targets, tmp))
+    if(targets is None):
+        print(f"iout={iout}, No target")
         continue
-    snap = snap1s.get_snap(target['timestep'])
-    from ramses_function import *
-    # Variable in this snapshot
-    h0 = params('h0', snap)
-    aexp = params('aexp', snap)
-    omega_m = params('omega_m', snap)
-    scale_nH = params('scale_nH', snap)
-    nCOM = params('nCOM', snap)
-    d_gmc = params('d_gmc', snap)
-    factG = params('factG', snap)
-    dt_old = params('dt_old', snap)
-    dt_new = params('dt_new', snap)
-    mass_sph = params('mass_sph', snap)
-    localseed = params('localseed', snap)
-    nlevelmax = snap.params['levelmax']
-    dx_min   = 0.5**nlevelmax
-    vol_min  = dx_min**snap.params['ndim']
-    dt_iout = get_dt(snap, snap1s)
-    ndtype = [('dense', bool),
-        ('trgv', 'f8'), ('c_s2', 'f8'), ('mach2', 'f8'), 
-        ('alpha0', 'f8'), ('sigs', 'f8'), ('scrit', 'f8'), 
-        ('sfr_ff', 'f8'), ('tstar', 'f8'), ('mstar', 'f8'), 
-        ('nstar_fine', 'i8'), ('dt_fine', 'f8'), ('PoissMean_fine', 'f8'), ('nstar_corr_fine', 'f8'),
-        ('nstar_iout', 'i8'), ('dt_iout', 'f8'), ('PoissMean_iout', 'f8'), ('nstar_corr_iout', 'f8')
-        ]
+    else:
+        if(not os.path.isdir(f"{database1}/SF/{iout:05d}")):
+            os.makedirs(f"{database1}/SF/{iout:05d}")
+    for target in tqdm(targets, desc=f"[iout={iout}]"):
+        tid = target['id']; iid = target['lastid']
+        # try:
+        #     branch = rtree1[iid]
+        #     if(iout in branch['timestep']):
+        #         target = branch[branch['timestep'] == iout][0]
+        #     else:
+        #         raise ValueError("No target")
+        #     # target = rtree1[iid][-1]
+        #     # tnext = rtree1[iid][-2]
+        #     # print(f"{iid}, {target['mstar_vir']=:}")
+        #     # print(f"{iid}, {tnext['mstar_vir']=:}")
+        # except:
+        #     continue
+        from ramses_function import *
+        # Variable in this snapshot
+        h0 = params('h0', snap)
+        aexp = params('aexp', snap)
+        omega_m = params('omega_m', snap)
+        scale_nH = params('scale_nH', snap)
+        nCOM = params('nCOM', snap)
+        d_gmc = params('d_gmc', snap)
+        factG = params('factG', snap)
+        dt_old = params('dt_old', snap)
+        dt_new = params('dt_new', snap)
+        mass_sph = params('mass_sph', snap)
+        localseed = params('localseed', snap)
+        nlevelmax = snap.params['levelmax']
+        dx_min   = 0.5**nlevelmax
+        vol_min  = dx_min**snap.params['ndim']
+        dt_iout = get_dt(snap, snap1s)
+        ndtype = [('dense', bool),
+            ('trgv', 'f8'), ('c_s2', 'f8'), ('mach2', 'f8'), 
+            ('alpha0', 'f8'), ('sigs', 'f8'), ('scrit', 'f8'), 
+            ('sfr_ff', 'f8'), ('tstar', 'f8'), ('mstar', 'f8'), 
+            ('nstar_fine', 'i8'), ('dt_fine', 'f8'), ('PoissMean_fine', 'f8'), ('nstar_corr_fine', 'f8'),
+            ('nstar_iout', 'i8'), ('dt_iout', 'f8'), ('PoissMean_iout', 'f8'), ('nstar_corr_iout', 'f8')
+            ]
 
 
-    newcells = cell_calc(target, snap)
-    snap.clear()
-    if(np.max(newcells['nstar_iout'])>0):
-        where = newcells['sfr_ff']>0
-        print(newcells[where]['sfr_ff'])
-        print(newcells[where]['nstar_fine'])
-        print(newcells[where]['nstar_iout'])
+        newcells = cell_calc(target, snap)
+        pklsave(newcells, f"{database1}/SF/{iout:05d}/{iid:07d}.pickle")
+        snap.clear()
+        # if(np.max(newcells['nstar_iout'])>0):
+        #     where = newcells['sfr_ff']>0
+        #     print(newcells[where]['sfr_ff'])
+        #     print(newcells[where]['nstar_fine'])
+        #     print(newcells[where]['nstar_iout'])

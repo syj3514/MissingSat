@@ -220,7 +220,7 @@ print(f"\nNew Horizon 2\n")
 halos = pklload(f"{database2}/halo_dict.pickle")
 keys = list(halos.keys())
 for key in keys:
-    if((key%10 != mod)):
+    if(key%10 != mod):
         del halos[key]
 cursor = 0
 nsub = len(allsubs2)

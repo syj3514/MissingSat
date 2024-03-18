@@ -31,6 +31,7 @@ mH = 1.6600000e-24
 that controls the actual amount of gas 
 above scrit that is able to form stars'''
 e_cts = 0.5  # would be 1.0 without feedback (Federrath & Klessen 2012)
+eps_star=0.5             #base SF efficiency (was not settable in NH!)
 '''empirical parameters of the model 
 determined by the best-fit values 
 between the theory and the numerical experiments
@@ -224,7 +225,7 @@ def erfc(x):
     q6= 1.04765104356545238e+01; q7= 1.48455557345597957e+01
 
     y = x**2
-    y = np.exp(-y)*x*(p7/(y+q7)+p6/(y+q6) + p5/(y+q5)+p4/(y+q4)+p3/(y+q3) + p2/(y+q2)+p1/(y+q1)+p0/(y+q0))
+    y = np.exp(-y) * x * ( p7/(y+q7)+p6/(y+q6) + p5/(y+q5)+p4/(y+q4)+p3/(y+q3) + p2/(y+q2)+p1/(y+q1) + p0/(y+q0))
     if (x < ph): y = y+2/(np.exp(pv*x)+1)
     return y
 def erfcs(xs):
@@ -239,7 +240,7 @@ def erfcs(xs):
     q6= 1.04765104356545238e+01; q7= 1.48455557345597957e+01
 
     ys = xs**2
-    ys = np.exp(-ys)*xs*(p7/(ys+q7)+p6/(ys+q6) + p5/(ys+q5)+p4/(ys+q4)+p3/(ys+q3) + p2/(ys+q2)+p1/(ys+q1)+p0/(ys+q0))
+    ys = np.exp(-ys) * xs * ( p7/(ys+q7)+p6/(ys+q6) + p5/(ys+q5)+p4/(ys+q4)+p3/(ys+q3) + p2/(ys+q2)+p1/(ys+q1) + p0/(ys+q0) )
     where = (xs < ph)
     ys[where] = ys[where]+2/(np.exp(pv*xs[where])+1)
     return ys
