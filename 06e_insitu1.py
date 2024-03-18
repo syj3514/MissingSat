@@ -1,5 +1,5 @@
 from IPython import get_ipython
-ncpu = 24
+ncpu = 16
 # ioutmax = 10000
 # ioutmin = -10000
 ioutmax = 10000
@@ -199,7 +199,7 @@ for fname in fnames:
         iterobj = async_result
         for r in iterobj:
             r.get()
-            
+    isnap.clear()
     pklsave(results, f"{database1}/stable_prog/props/insitu_{iout:05d}.pickle")
     print(f"`{database1}/stable_prog/props/insitu_{iout:05d}.pickle` save done")
     flush(msg=True)
