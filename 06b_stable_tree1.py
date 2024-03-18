@@ -90,42 +90,42 @@ upairs1 = allsubs1[states1 == 'upair']
 print(len(allsubs1), np.unique(states1, return_counts=True))  
 
 
-mode2 = 'nh2'
-database2 = f"/home/jeon/MissingSat/database/{mode2}"
-iout2 = 797
-repo2, rurmode2, dp2 = mode2repo(mode2)
-snap2 = uri.RamsesSnapshot(repo2, iout2, mode=rurmode2)
-snap2s = uri.TimeSeries(snap2)
-snap2s.read_iout_avail()
-nout2 = snap2s.iout_avail['iout']; nout=nout2[nout2 <= iout2]
-gals2 = uhmi.HaloMaker.load(snap2, galaxy=True, double_precision=dp2)
-hals2 = uhmi.HaloMaker.load(snap2, galaxy=False, double_precision=dp2)
+# mode2 = 'nh2'
+# database2 = f"/home/jeon/MissingSat/database/{mode2}"
+# iout2 = 797
+# repo2, rurmode2, dp2 = mode2repo(mode2)
+# snap2 = uri.RamsesSnapshot(repo2, iout2, mode=rurmode2)
+# snap2s = uri.TimeSeries(snap2)
+# snap2s.read_iout_avail()
+# nout2 = snap2s.iout_avail['iout']; nout=nout2[nout2 <= iout2]
+# gals2 = uhmi.HaloMaker.load(snap2, galaxy=True, double_precision=dp2)
+# hals2 = uhmi.HaloMaker.load(snap2, galaxy=False, double_precision=dp2)
 
-LG2 = pklload(f"{database2}/LocalGroup.pickle")
-allsats2 = None; allsubs2 = None; states2 = None
-keys2 = list(LG2.keys())
-for key in keys2:
-    sats = LG2[key]['sats']; subs = LG2[key]['subs']; real = LG2[key]['real']
-    dink = real[real['state']=='dink']['hid']
-    ind = isin(subs['id'], dink)
-    subs['dink'][ind] = True; subs['dink'][~ind] = False
-    state = np.zeros(len(subs), dtype='<U7')
-    state[ind] = 'dink'; state[~ind] = 'pair'
+# LG2 = pklload(f"{database2}/LocalGroup.pickle")
+# allsats2 = None; allsubs2 = None; states2 = None
+# keys2 = list(LG2.keys())
+# for key in keys2:
+#     sats = LG2[key]['sats']; subs = LG2[key]['subs']; real = LG2[key]['real']
+#     dink = real[real['state']=='dink']['hid']
+#     ind = isin(subs['id'], dink)
+#     subs['dink'][ind] = True; subs['dink'][~ind] = False
+#     state = np.zeros(len(subs), dtype='<U7')
+#     state[ind] = 'dink'; state[~ind] = 'pair'
     
-    upair = real[real['state']=='upair']['hid']
-    ind = isin(subs['id'], upair)
-    state[ind] = 'upair'
+#     upair = real[real['state']=='upair']['hid']
+#     ind = isin(subs['id'], upair)
+#     state[ind] = 'upair'
 
-    allsats2 = sats if allsats2 is None else np.hstack((allsats2, sats))
-    allsubs2 = subs if allsubs2 is None else np.hstack((allsubs2, subs))
-    states2 = state if states2 is None else np.hstack((states2, state))
-argsort = np.argsort(allsubs2['id'])
-allsubs2 = allsubs2[argsort]; states2 = states2[argsort]
-dinks2 = allsubs2[states2 == 'dink']
-pairs2 = allsubs2[states2 == 'pair']
-upairs2 = allsubs2[states2 == 'upair']
+#     allsats2 = sats if allsats2 is None else np.hstack((allsats2, sats))
+#     allsubs2 = subs if allsubs2 is None else np.hstack((allsubs2, subs))
+#     states2 = state if states2 is None else np.hstack((states2, state))
+# argsort = np.argsort(allsubs2['id'])
+# allsubs2 = allsubs2[argsort]; states2 = states2[argsort]
+# dinks2 = allsubs2[states2 == 'dink']
+# pairs2 = allsubs2[states2 == 'pair']
+# upairs2 = allsubs2[states2 == 'upair']
 
-print(len(allsubs2), np.unique(states2, return_counts=True))
+# print(len(allsubs2), np.unique(states2, return_counts=True))
 
 
 

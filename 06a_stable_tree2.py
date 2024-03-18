@@ -53,42 +53,42 @@ from common_func import *
 
 
 
-mode1 = 'nh'
-database1 = f"/home/jeon/MissingSat/database/{mode1}"
-iout1 = 1026
-repo1, rurmode1, dp1 = mode2repo(mode1)
-snap1 = uri.RamsesSnapshot(repo1, iout1, mode=rurmode1)
-snap1s = uri.TimeSeries(snap1)
-snap1s.read_iout_avail()
-nout1 = snap1s.iout_avail['iout']; nout=nout1[nout1 <= iout1]
-gals1 = uhmi.HaloMaker.load(snap1, galaxy=True, double_precision=dp1)
-hals1 = uhmi.HaloMaker.load(snap1, galaxy=False, double_precision=dp1)
+# mode1 = 'nh'
+# database1 = f"/home/jeon/MissingSat/database/{mode1}"
+# iout1 = 1026
+# repo1, rurmode1, dp1 = mode2repo(mode1)
+# snap1 = uri.RamsesSnapshot(repo1, iout1, mode=rurmode1)
+# snap1s = uri.TimeSeries(snap1)
+# snap1s.read_iout_avail()
+# nout1 = snap1s.iout_avail['iout']; nout=nout1[nout1 <= iout1]
+# gals1 = uhmi.HaloMaker.load(snap1, galaxy=True, double_precision=dp1)
+# hals1 = uhmi.HaloMaker.load(snap1, galaxy=False, double_precision=dp1)
 
-LG1 = pklload(f"{database1}/LocalGroup.pickle")
-allsats1 = None; allsubs1 = None; states1 = None
-keys1 = list(LG1.keys())
-for key in keys1:
-    sats = LG1[key]['sats']; subs = LG1[key]['subs']; real = LG1[key]['real']
-    dink = real[real['state']=='dink']['hid']
-    ind = isin(subs['id'], dink)
-    subs['dink'][ind] = True; subs['dink'][~ind] = False
-    state = np.zeros(len(subs), dtype='<U7')
-    state[ind] = 'dink'; state[~ind] = 'pair'
+# LG1 = pklload(f"{database1}/LocalGroup.pickle")
+# allsats1 = None; allsubs1 = None; states1 = None
+# keys1 = list(LG1.keys())
+# for key in keys1:
+#     sats = LG1[key]['sats']; subs = LG1[key]['subs']; real = LG1[key]['real']
+#     dink = real[real['state']=='dink']['hid']
+#     ind = isin(subs['id'], dink)
+#     subs['dink'][ind] = True; subs['dink'][~ind] = False
+#     state = np.zeros(len(subs), dtype='<U7')
+#     state[ind] = 'dink'; state[~ind] = 'pair'
     
-    upair = real[real['state']=='upair']['hid']
-    ind = isin(subs['id'], upair)
-    state[ind] = 'upair'
+#     upair = real[real['state']=='upair']['hid']
+#     ind = isin(subs['id'], upair)
+#     state[ind] = 'upair'
 
-    allsats1 = sats if allsats1 is None else np.hstack((allsats1, sats))
-    allsubs1 = subs if allsubs1 is None else np.hstack((allsubs1, subs))
-    states1 = state if states1 is None else np.hstack((states1, state))
-argsort = np.argsort(allsubs1['id'])
-allsubs1 = allsubs1[argsort]; states1 = states1[argsort]
-dinks1 = allsubs1[states1 == 'dink']
-pairs1 = allsubs1[states1 == 'pair']
-upairs1 = allsubs1[states1 == 'upair']
+#     allsats1 = sats if allsats1 is None else np.hstack((allsats1, sats))
+#     allsubs1 = subs if allsubs1 is None else np.hstack((allsubs1, subs))
+#     states1 = state if states1 is None else np.hstack((states1, state))
+# argsort = np.argsort(allsubs1['id'])
+# allsubs1 = allsubs1[argsort]; states1 = states1[argsort]
+# dinks1 = allsubs1[states1 == 'dink']
+# pairs1 = allsubs1[states1 == 'pair']
+# upairs1 = allsubs1[states1 == 'upair']
 
-print(len(allsubs1), np.unique(states1, return_counts=True))  
+# print(len(allsubs1), np.unique(states1, return_counts=True))  
 
 
 mode2 = 'nh2'
@@ -130,43 +130,43 @@ print(len(allsubs2), np.unique(states2, return_counts=True))
 
 
 
-if(not os.path.exists(f"{database1}/06b_shared_particles.pickle")):
-    ptree_dm1 = pklload("/storage6/NewHorizon/ptree_dm/ptree_stable.pkl")
-    lastouts1 = nout1[snap1s.iout_avail['age'] >= np.max(snap1s.iout_avail['age']-1)]
-    ptree_dm1 = ptree_dm1[isin(ptree_dm1['timestep'], lastouts1)]
-    halos1 = pklload(f"{database1}/halo_dict.pickle")
-    prog_fromp1 = {}
-    tmp = ptree_dm1[ptree_dm1['timestep']==1026]
-    for sub in tqdm(allsubs1, desc='branch from ptree'):
-        last = tmp[tmp['hmid'] == sub['id']][0]['last']
-        branch = ptree_dm1[ptree_dm1['last'] == last]
+# if(not os.path.exists(f"{database1}/06b_shared_particles.pickle")):
+#     ptree_dm1 = pklload("/storage6/NewHorizon/ptree_dm/ptree_stable.pkl")
+#     lastouts1 = nout1[snap1s.iout_avail['age'] >= np.max(snap1s.iout_avail['age']-1)]
+#     ptree_dm1 = ptree_dm1[isin(ptree_dm1['timestep'], lastouts1)]
+#     halos1 = pklload(f"{database1}/halo_dict.pickle")
+#     prog_fromp1 = {}
+#     tmp = ptree_dm1[ptree_dm1['timestep']==1026]
+#     for sub in tqdm(allsubs1, desc='branch from ptree'):
+#         last = tmp[tmp['hmid'] == sub['id']][0]['last']
+#         branch = ptree_dm1[ptree_dm1['last'] == last]
         
-        mybranch = None
-        for ib in branch:
-            index = halos1['index'][ib['timestep']][ib['hmid']-1]
-            ihal = halos1['catalog'][ib['timestep']][index]
-            mybranch = ihal if(mybranch is None) else np.hstack((mybranch, ihal))
-        prog_fromp1[sub['id']] = mybranch
-    pklsave(prog_fromp1, f"{database1}/06a_branch_from_ptree.pickle")
+#         mybranch = None
+#         for ib in branch:
+#             ihal = halos1[ib['timestep']][ib['hmid']-1]
+#             assert ihal['id']==ib['hmid']
+#             mybranch = ihal if(mybranch is None) else np.hstack((mybranch, ihal))
+#         prog_fromp1[sub['id']] = mybranch
+#     pklsave(prog_fromp1, f"{database1}/06a_branch_from_ptree.pickle")
 
-    count = 0
-    shared_particles1 = {}
-    for target in tqdm(allsubs1, desc='shared particle maximum'):
-        count += 1
-        progs = prog_fromp1[target['id']]
-        parts = uhmi.HaloMaker.read_member_general(snap1s, progs, galaxy=False)
-        ids, counts = np.unique(parts['id'], return_counts=True)
-        thresh = len(progs)
-        stables = np.array([], dtype=int)
-        while len(stables) < target['nparts']/10:
-            stables = ids[counts >= thresh]
-            thresh -= 1
-            if(thresh < 1):
-                break
-        shared_particles1[target['id']] = stables
-        if(count%100 == 0):
-            snap1s.clear()
-    pklsave(shared_particles1, f"{database1}/06b_shared_particles.pickle")
+#     count = 0
+#     shared_particles1 = {}
+#     for target in tqdm(allsubs1, desc='shared particle maximum'):
+#         count += 1
+#         progs = prog_fromp1[target['id']]
+#         parts = uhmi.HaloMaker.read_member_general(snap1s, progs, galaxy=False)
+#         ids, counts = np.unique(parts['id'], return_counts=True)
+#         thresh = len(progs)
+#         stables = np.array([], dtype=int)
+#         while len(stables) < target['nparts']/10:
+#             stables = ids[counts >= thresh]
+#             thresh -= 1
+#             if(thresh < 1):
+#                 break
+#         shared_particles1[target['id']] = stables
+#         if(count%100 == 0):
+#             snap1s.clear()
+#     pklsave(shared_particles1, f"{database1}/06b_shared_particles.pickle")
 
 
 if(not os.path.exists(f"{database2}/06b_shared_particles.pickle")):
@@ -186,8 +186,8 @@ if(not os.path.exists(f"{database2}/06b_shared_particles.pickle")):
             
             mybranch = None
             for ib in branch:
-                index = halos2['index'][ib['timestep']][ib['hmid']-1]
-                ihal = halos2['catalog'][ib['timestep']][index]
+                ihal = halos2[ib['timestep']][ib['hmid']-1]
+                assert ihal['id']==ib['hmid']
                 mybranch = ihal if(mybranch is None) else np.hstack((mybranch, ihal))
             prog_fromp2[sub['id']] = mybranch
         pklsave(prog_fromp2, f"{database2}/06a_branch_from_ptree.pickle")

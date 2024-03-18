@@ -145,27 +145,27 @@ def get_nbor(icell, cells, return_nbor=False):
     dx = icell['dx']
     distx = np.abs(cells['x'] - icell['x'])
     if(len(cells)>300000):
-        size = 128*dx
+        size = 1.5001*dx
         indx = distx <= size
         cells = cells[indx]
         distx = np.abs(cells['x'] - icell['x'])
     disty = np.abs(cells['y'] - icell['y'])
     if(len(cells)>300000):
-        size = 128*dx
+        size = 1.5001*dx
         indy = disty <= size
         cells = cells[indy]
         distx = np.abs(cells['x'] - icell['x'])
         disty = np.abs(cells['y'] - icell['y'])
     distz = np.abs(cells['z'] - icell['z'])
     if(len(cells)>300000):
-        size = 128*dx
+        size = 1.5001*dx
         indz = distz <= size
         cells = cells[indz]
         distx = np.abs(cells['x'] - icell['x'])
         disty = np.abs(cells['y'] - icell['y'])
         distz = np.abs(cells['z'] - icell['z'])
     if(len(cells)>300000):
-        size = 64*dx
+        size = 1.5001*dx
         indx = distx <= size
         indy = disty <= size
         indz = distz <= size
@@ -174,18 +174,20 @@ def get_nbor(icell, cells, return_nbor=False):
         disty = np.abs(cells['y'] - icell['y'])
         distz = np.abs(cells['z'] - icell['z'])
     dxs = 1 / 2**cells['level'] # <--- main bottleneck
-    size = (dx + dxs)/2
+    size = 1.0001*(dx + dxs)/2
     indx = distx <= size
     indy = disty <= size
     indz = distz <= size
     neighs = cells[indx&indy&indz]
-    neighs = neighs[neighs['rho'] != icell['rho']]
+    # remove itself
+    itself = (neighs['x'] == icell['x'])&(neighs['y'] == icell['y'])&(neighs['z'] == icell['z'])
+    neighs = neighs[~itself]
     
     
-
-    samez = (neighs['z'] <= (icell['z'] + icell['dx']/2))&(neighs['z'] >= (icell['z'] - icell['dx']/2))
-    samey = (neighs['y'] <= (icell['y'] + icell['dx']/2))&(neighs['y'] >= (icell['y'] - icell['dx']/2))
-    samex = (neighs['x'] <= (icell['x'] + icell['dx']/2))&(neighs['x'] >= (icell['x'] - icell['dx']/2))
+    # Find aligned cells
+    samez = (neighs['z'] <= (icell['z'] + icell['dx']/1.999))&(neighs['z'] >= (icell['z'] - icell['dx']/1.99))
+    samey = (neighs['y'] <= (icell['y'] + icell['dx']/1.999))&(neighs['y'] >= (icell['y'] - icell['dx']/1.99))
+    samex = (neighs['x'] <= (icell['x'] + icell['dx']/1.999))&(neighs['x'] >= (icell['x'] - icell['dx']/1.999))
 
     # left right
     sameyz = samey & samez
@@ -210,8 +212,13 @@ def wmean(vals,ws):
     return np.average(vals, weights=ws)
 
 def cell_calc(target, snap):
-    radii = 1.5
+    radii = 1
     snap.set_box_halo(target, radii, radius_name='r')
+    snap.get_cell(nthread=16)
+    maxdx = 1 / 2**np.min(snap.cell['level']-1)
+    snap.box[0,0] -= maxdx; snap.box[0,1] += maxdx
+    snap.box[1,0] -= maxdx; snap.box[1,1] += maxdx
+    snap.box[2,0] -= maxdx; snap.box[2,1] += maxdx
     snap.get_cell(nthread=16)
     allcells = snap.cell
     cells = cut_sphere(allcells, target['x'], target['y'], target['z'], target['r'])
@@ -224,25 +231,27 @@ def cell_calc(target, snap):
     if(np.sum(newcells['dense'])==0):
         snap.clear()
         return newcells
-    print(np.sum(newcells['dense']))
+    print(len(allcells),np.sum(newcells['dense']))
     where = np.where(newcells['dense'])[0]
-    # for i, icell in tqdm(enumerate(cells), total=len(cells)):
     for i, icell in tqdm(zip(where, cells[newcells['dense']]), total=np.sum(newcells['dense'])):
         if(not newcells[i]['dense']): continue
         ls,rs,fs,bs,us,ds = get_nbor(icell, allcells, return_nbor=False)
-        while(len(ls)==0 or len(rs)==0 or len(fs)==0 or len(bs)==0 or len(us)==0 or len(ds)==0):
-            radii += 0.5
-            snap.set_box_halo(target, radii, radius_name='r')
-            snap.get_cell(nthread=16)
-            allcells = snap.cell
-            ls,rs,fs,bs,us,ds = get_nbor(icell, allcells, return_nbor=False)
-            if(radii > 4):
-                newcells[i]['trgv'] = np.nan
-                radii = 1.5
-                snap.set_box_halo(target, radii, radius_name='r')
-                snap.get_cell(nthread=16)
-                allcells = snap.cell
-                break
+        if(len(ls)==0 or len(rs)==0 or len(fs)==0 or len(bs)==0 or len(us)==0 or len(ds)==0):
+            print(len(ls), len(rs), len(fs), len(bs), len(us), len(ds))
+            # radii += 0.5
+            # snap.set_box_halo(target, radii, radius_name='r')
+            # snap.get_cell(nthread=16)
+            # allcells = snap.cell
+            # ls,rs,fs,bs,us,ds = get_nbor(icell, allcells, return_nbor=False)
+            # if(radii > 4):
+            #     newcells[i]['trgv'] = np.nan
+            #     radii = 1.5
+            #     snap.set_box_halo(target, radii, radius_name='r')
+            #     snap.get_cell(nthread=16)
+            #     allcells = snap.cell
+            #     break
+            # raise ValueError("Enlarge????")
+            newcells[i]['trgv'] = np.nan
         if(np.isnan(newcells[i]['trgv'])): continue
 
         # The local 3D instantaneous velocity dispersion sig_g
@@ -299,9 +308,9 @@ def cell_calc(target, snap):
         PoissMean_fine = min( dt_fine*sfr_ff/tstar*mcell/mstar, 10)
         PoissMean_iout = min( dt_iout*sfr_ff/tstar*mcell/mstar, 10)
         nstar_fine = poissdev(localseed,PoissMean_fine,nstar_fine)
-        if(PoissMean_fine>0.4): print(f"{PoissMean_fine=}, {nstar_fine=}")
+        # if(PoissMean_fine>0.4): print(f"{PoissMean_fine=}, {nstar_fine=}")
         nstar_iout = poissdev(localseed,PoissMean_iout,nstar_iout)
-        if(PoissMean_iout>0.4): print(f"{PoissMean_iout=}, {nstar_iout=}")
+        # if(PoissMean_iout>0.4): print(f"{PoissMean_iout=}, {nstar_iout=}")
         nstar_corr_fine=nstar_fine; nstar_corr_iout=nstar_iout
         mgas_fine = nstar_fine*mstar
         if(mgas_fine > 0.9*mcell): nstar_corr_fine = int(0.9*mcell/mstar)
@@ -325,7 +334,7 @@ def cell_calc(target, snap):
         newcells[i]['dt_iout'] = dt_iout
         newcells[i]['PoissMean_iout'] = PoissMean_iout
         newcells[i]['nstar_corr_iout'] = nstar_corr_iout
-        if(nstar_iout>0): print(newcells[i])
+        # if(nstar_iout>0): print(newcells[i])
     snap.clear()
     return newcells
 ###########################################################
@@ -333,6 +342,7 @@ def cell_calc(target, snap):
 ###########################################################
 for pair in pairs1:
     iid = pair['id']
+    if(iid<22517): continue
     try:
         target = rtree1[iid][-1]
         tnext = rtree1[iid][-2]

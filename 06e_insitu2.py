@@ -94,13 +94,19 @@ allsubs2 = allsubs2[argsort]
 states2 = states2[argsort]
 
 
+
+
 stree2 = pklload(f"{database2}/stable_tree.pickle")
-def _insitu_SF(ith, maxbstar, maxnstar, address, shape, dtype, reft):
+def _insitu_SF(ith, maxbstar, maxnstar, address, shape, dtype, reft, needed):
     global ihals, isnap, refn
 
     exist = shared_memory.SharedMemory(name=address)
     results = np.ndarray(shape=shape, dtype=dtype, buffer=exist.buf)
-
+    if(not needed[ith]):
+        refn.value += 1
+        if(refn.value%500==0)&(refn.value>0):
+            print(f" > {refn.value}/{len(results)} {time.time()-reft:.2f} sec (ETA: {(len(results)-refn.value)*(time.time()-reft)/refn.value/60:.2f} min)")
+        return None
     ihal = ihals[ith]
     ibox = np.array([[ihal['x']-ihal['r'], ihal['x']+ihal['r']],
                         [ihal['y']-ihal['r'], ihal['y']+ihal['r']],
@@ -167,13 +173,6 @@ for fname in fnames:
 
     ihals = pklload(f"{database2}/stable_prog/{fname}")[0]
     nsub = len(ihals)
-    cpulist = isnap.get_halos_cpulist(ihals, 1, radius_name='r', nthread=ncpu)
-    uri.timer.verbose=1
-    if(isnap.mode=='nh'):
-        isnap.get_part(pname='star', nthread=ncpu, target_fields=['x','y','z','m','epoch','id'], exact_box=False, domain_slicing=True, cpulist=cpulist)
-    else:
-        isnap.get_part(pname='star', nthread=ncpu, target_fields=['x','y','z','m','family','id'], exact_box=False, domain_slicing=True, cpulist=cpulist)
-    uri.timer.verbose=0
 
 
     print(f"[IOUT {iout:05d}]")
@@ -185,16 +184,38 @@ for fname in fnames:
     memory = shared_memory.SharedMemory(create=True, size=results.nbytes)
     results = np.ndarray(results.shape, dtype=newdtype, buffer=memory.buf)
     results['lastid'] = ihals['lastid']
-    
-    
-    reft = time.time()
-    refn = Value('i', 0)
-    with Pool(processes=ncpu) as pool:
-        async_result = [pool.apply_async(_insitu_SF, (ith, maxbstar, maxnstar, memory.name, results.shape, newdtype, reft)) for ith in range(nsub)]
-        # iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
-        iterobj = async_result
-        for r in iterobj:
-            r.get()
+    isneed = np.full(nsub, True, dtype=bool)
+    if(os.path.exists(f"{database2}/stable_prog/old/props/insitu_{iout:05d}.pickle")):
+        oldhals = pklload(f"{database2}/stable_prog/old/subhalos_{iout:05d}.pickle")[0]
+        oldsitu = pklload(f"{database2}/stable_prog/old/props/insitu_{iout:05d}.pickle")
+        for i in range(nsub):
+            ihal = ihals[i]
+            where1 = ihal['lastid'] == oldhals['lastid']
+            where2 = ihal['id'] == oldhals['id']
+            if(True in where1&where2):
+                already = oldsitu[where1&where2][0]
+                results[i] = already
+                isneed[i] = False
+    needed = ihals[isneed]
+    if(len(needed)==0):
+        pass
+    else:
+        cpulist = isnap.get_halos_cpulist(ihals, 1, radius_name='r', nthread=ncpu)
+        uri.timer.verbose=1
+        if(isnap.mode=='nh'):
+            isnap.get_part(pname='star', nthread=ncpu, target_fields=['x','y','z','m','epoch','id'], exact_box=False, domain_slicing=True, cpulist=cpulist)
+        else:
+            isnap.get_part(pname='star', nthread=ncpu, target_fields=['x','y','z','m','family','id'], exact_box=False, domain_slicing=True, cpulist=cpulist)
+        uri.timer.verbose=0
+        
+        reft = time.time()
+        refn = Value('i', 0)
+        with Pool(processes=ncpu) as pool:
+            async_result = [pool.apply_async(_insitu_SF, (ith, maxbstar, maxnstar, memory.name, results.shape, newdtype, reft, needed)) for ith in range(nsub)]
+            # iterobj = tqdm(async_result, total=len(async_result), desc=f"IOUT{iout:05d} ")# if(uri.timer.verbose>=1) else async_result
+            iterobj = async_result
+            for r in iterobj:
+                r.get()
     isnap.clear()
     pklsave(results, f"{database2}/stable_prog/props/insitu_{iout:05d}.pickle")
     print(f"`{database2}/stable_prog/props/insitu_{iout:05d}.pickle` save done")
