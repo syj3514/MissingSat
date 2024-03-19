@@ -116,38 +116,48 @@ for fname in tqdm( fnames2 ):
     cursor += len(tmp)
 trees2 = trees2[trees2['timestep'] <= iout2]
 
-stable_tree2 = {}
-for i, sub in tqdm(enumerate(allsubs2), total=len(allsubs2)):
-    arg = np.where(allsubs2['id']==sub['id'])[0][0]
-    branch = trees2[arg::len(allsubs2)]#[trees['lastid'] == target['id']]
-    branch = branch[branch['take_score']>0]
+if(not os.path.exists(f"{database2}/stable_tree.pickle")):
+    stable_tree2 = {}
+    for i, sub in tqdm(enumerate(allsubs2), total=len(allsubs2)):
+        arg = np.where(allsubs2['id']==sub['id'])[0][0]
+        branch = trees2[arg::len(allsubs2)]#[trees['lastid'] == target['id']]
+        branch = branch[branch['take_score']>0]
 
-    score = branch['give_score']*branch['take_score']/branch['aexp']*snap2['aexp']
-    umask = (score > 0.1) & (branch['take_score']>0.05)# | ((branch['give_score']+branch['take_score']) > 1.1) | (branch['take_score'] > 0.4)
+        score = branch['give_score']*branch['take_score']/branch['aexp']*snap2['aexp']
+        umask = (score > 0.1) & (branch['take_score']>0.05)# | ((branch['give_score']+branch['take_score']) > 1.1) | (branch['take_score'] > 0.4)
 
-    dx = np.abs(np.diff(branch['x']))
-    meandx = np.mean(dx)
-    dy = np.abs(np.diff(branch['y']))
-    meandy = np.mean(dy)
-    dz = np.abs(np.diff(branch['z']))
-    meandz = np.mean(dz)
-    dp = np.sqrt(dx**2 + dy**2 + dz**2)
-    meandp = np.sqrt(meandx**2 + meandy**2 + meandz**2)*3
-    pmask = dp <= meandp
-    pmask = np.insert(pmask, 0, True)
+        dx = np.abs(np.diff(branch['x']))
+        meandx = np.mean(dx)
+        dy = np.abs(np.diff(branch['y']))
+        meandy = np.mean(dy)
+        dz = np.abs(np.diff(branch['z']))
+        meandz = np.mean(dz)
+        dp = np.sqrt(dx**2 + dy**2 + dz**2)
+        meandp = np.sqrt(meandx**2 + meandy**2 + meandz**2)*3
+        pmask = dp <= meandp
+        pmask = np.insert(pmask, 0, True)
 
-    first = np.min(branch['timestep'][umask & pmask])
+        first = np.min(branch['timestep'][umask & pmask])
 
-    cbranch = branch[branch['timestep'] >= first]
-    top20per = top20per = np.argsort(branch['take_score'])[-int(len(branch)/5):]
-    if(len(top20per)>10):
-        m16,m50,m84 = np.percentile(branch['mdm_vir'][top20per], q=[16,50,84])
-        lower = m16/20; upper = m84*20
-        if(lower > branch[0]['mdm_vir']): lower = branch[0]['mdm_vir']
-        if(upper < branch[0]['mdm_vir']): upper = branch[0]['mdm_vir']
-    else:
-        lower = branch[0]['mdm_vir']/20; upper = branch[0]['mdm_vir']*20
+        cbranch = branch[branch['timestep'] >= first]
+        top20per = top20per = np.argsort(branch['take_score'])[-int(len(branch)/5):]
+        if(len(top20per)>10):
+            m16,m50,m84 = np.percentile(branch['mdm_vir'][top20per], q=[16,50,84])
+            lower = m16/20; upper = m84*20
+            if(lower > branch[0]['mdm_vir']): lower = branch[0]['mdm_vir']
+            if(upper < branch[0]['mdm_vir']): upper = branch[0]['mdm_vir']
+        else:
+            lower = branch[0]['mdm_vir']/20; upper = branch[0]['mdm_vir']*20
 
-    mbranch = cbranch[(cbranch['mdm_vir'] <= upper)&(cbranch['mdm_vir'] >= lower)&(cbranch['take_score']>0.01)]
-    stable_tree2[sub['id']] = mbranch
-pklsave(stable_tree2,f"{database2}/stable_tree.pickle", overwrite=True)
+        mbranch = cbranch[(cbranch['mdm_vir'] <= upper)&(cbranch['mdm_vir'] >= lower)&(cbranch['take_score']>0.01)]
+        stable_tree2[sub['id']] = mbranch
+    pklsave(stable_tree2,f"{database2}/stable_tree.pickle", overwrite=True)
+
+if(not os.path.exists(f"{database2}/stable_tree_raw.pickle")):
+    stable_tree2 = {}
+    for i, sub in tqdm(enumerate(allsubs2), total=len(allsubs2)):
+        arg = np.where(allsubs2['id']==sub['id'])[0][0]
+        branch = trees2[arg::len(allsubs2)]#[trees['lastid'] == target['id']]
+        branch = branch[branch['take_score']>0]
+        stable_tree2[sub['id']] = branch
+    pklsave(stable_tree2,f"{database2}/stable_tree_raw.pickle", overwrite=True)

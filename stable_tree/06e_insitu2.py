@@ -1,9 +1,9 @@
 from IPython import get_ipython
-ncpu = 16
-# ioutmax = 10000
-# ioutmin = -10000
+ncpu = 32
 ioutmax = 10000
-ioutmin = 800
+ioutmin = -10000
+# ioutmax = 10000
+# ioutmin = 700
 
 def type_of_script():
     """
@@ -57,25 +57,25 @@ from common_func import *
 
 
 
-mode1 = 'nh'
-database1 = f"/home/jeon/MissingSat/database/{mode1}"
-iout1 = 1026
-repo1, rurmode1, dp1 = mode2repo(mode1)
-snap1 = uri.RamsesSnapshot(repo1, iout1, mode=rurmode1)
-snap1s = uri.TimeSeries(snap1)
-snap1s.read_iout_avail()
-nout1 = snap1s.iout_avail['iout']; nout=nout1[nout1 <= iout1]
-gal1s = uhmi.HaloMaker.load(snap1, galaxy=True, double_precision=dp1)
-hal1s = uhmi.HaloMaker.load(snap1, galaxy=False, double_precision=dp1)
+mode2 = 'nh2'
+database2 = f"/home/jeon/MissingSat/database/{mode2}"
+iout2 = 797
+repo2, rurmode2, dp2 = mode2repo(mode2)
+snap2 = uri.RamsesSnapshot(repo2, iout2, mode=rurmode2)
+snap2s = uri.TimeSeries(snap2)
+snap2s.read_iout_avail()
+nout2 = snap2s.iout_avail['iout']; nout=nout2[nout2 <= iout2]
+gal2s = uhmi.HaloMaker.load(snap2, galaxy=True, double_precision=dp2)
+hal2s = uhmi.HaloMaker.load(snap2, galaxy=False, double_precision=dp2)
 
 
 
-LG1 = pklload(f"{database1}/LocalGroup.pickle")
-allsubs1 = None
-states1 = None
-for key in LG1.keys():
-    subs = LG1[key]['subs']
-    real = LG1[key]['real']
+LG2 = pklload(f"{database2}/LocalGroup.pickle")
+allsubs2 = None
+states2 = None
+for key in LG2.keys():
+    subs = LG2[key]['subs']
+    real = LG2[key]['real']
     dink = real[real['state']=='dink']['hid']
     ind = isin(subs['id'], dink)
     subs['dink'][ind] = True
@@ -87,16 +87,16 @@ for key in LG1.keys():
     ind = isin(subs['id'], upair)
     state[ind] = 'upair'
 
-    allsubs1 = subs if allsubs1 is None else np.hstack((allsubs1, subs))
-    states1 = state if states1 is None else np.hstack((states1, state))
-argsort = np.argsort(allsubs1['id'])
-allsubs1 = allsubs1[argsort]
-states1 = states1[argsort]
+    allsubs2 = subs if allsubs2 is None else np.hstack((allsubs2, subs))
+    states2 = state if states2 is None else np.hstack((states2, state))
+argsort = np.argsort(allsubs2['id'])
+allsubs2 = allsubs2[argsort]
+states2 = states2[argsort]
 
 
 
 
-stree1 = pklload(f"{database1}/stable_tree.pickle")
+stree2 = pklload(f"{database2}/stable_tree_raw.pickle")
 def _insitu_SF(ith, maxbstar, maxnstar, address, shape, dtype, reft, needed):
     global ihals, isnap, refn
 
@@ -150,28 +150,28 @@ def terminate(signum, *args):
 #############################################################
 # NewHorizon
 #############################################################
-print("\nNewHorizon1\n")
+print("\nNewHorizon2\n")
 
-fnames = os.listdir(f"{database1}/stable_prog/")
+fnames = os.listdir(f"{database2}/stable_prog/")
 fnames = [fname for fname in fnames if(fname.startswith("subhalos"))]
 fnames.sort()
 
-nstar = pklload(f"{database1}/nstar.pickle")
-if(not os.path.isdir(f"{database1}/stable_prog/props")):
-    os.mkdir(f"{database1}/stable_prog/props")
+nstar = pklload(f"{database2}/nstar.pickle")
+if(not os.path.isdir(f"{database2}/stable_prog/props")):
+    os.mkdir(f"{database2}/stable_prog/props")
 for fname in fnames:
     iout = int(fname[-12:-7])
-    if(os.path.exists(f"{database1}/stable_prog/props/insitu_{iout:05d}.pickle")):
+    if(os.path.exists(f"{database2}/stable_prog/props/insitu_{iout:05d}.pickle")):
         continue
     if(iout>=ioutmax)or(iout<ioutmin): continue
-    isnap = snap1s.get_snap(iout)
+    isnap = snap2s.get_snap(iout)
     if(not isnap.star[0]):
         continue
-    istep = np.where(nout1==iout)[0][0]
+    istep = np.where(nout2==iout)[0][0]
     maxbstar = nstar[istep-1]
     maxnstar = nstar[istep]
 
-    ihals = pklload(f"{database1}/stable_prog/{fname}")[0]
+    ihals = pklload(f"{database2}/stable_prog/{fname}")[0]
     nsub = len(ihals)
 
 
@@ -185,9 +185,9 @@ for fname in fnames:
     results = np.ndarray(results.shape, dtype=newdtype, buffer=memory.buf)
     results['lastid'] = ihals['lastid']
     isneed = np.full(nsub, True, dtype=bool)
-    if(os.path.exists(f"{database1}/stable_prog/old/props/insitu_{iout:05d}.pickle")):
-        oldhals = pklload(f"{database1}/stable_prog/old/subhalos_{iout:05d}.pickle")[0]
-        oldsitu = pklload(f"{database1}/stable_prog/old/props/insitu_{iout:05d}.pickle")
+    if(os.path.exists(f"{database2}/stable_prog/old/props/insitu_{iout:05d}.pickle")):
+        oldhals = pklload(f"{database2}/stable_prog/old/subhalos_{iout:05d}.pickle")[0]
+        oldsitu = pklload(f"{database2}/stable_prog/old/props/insitu_{iout:05d}.pickle")
         for i in range(nsub):
             ihal = ihals[i]
             where1 = ihal['lastid'] == oldhals['lastid']
@@ -200,7 +200,7 @@ for fname in fnames:
     if(len(needed)==0):
         pass
     else:
-        cpulist = isnap.get_halos_cpulist(needed, 1, radius_name='r', nthread=ncpu)
+        cpulist = isnap.get_halos_cpulist(ihals, 1, radius_name='r', nthread=ncpu)
         uri.timer.verbose=1
         if(isnap.mode=='nh'):
             isnap.get_part(pname='star', nthread=ncpu, target_fields=['x','y','z','m','epoch','id'], exact_box=False, domain_slicing=True, cpulist=cpulist)
@@ -217,6 +217,6 @@ for fname in fnames:
             for r in iterobj:
                 r.get()
     isnap.clear()
-    pklsave(results, f"{database1}/stable_prog/props/insitu_{iout:05d}.pickle")
-    print(f"`{database1}/stable_prog/props/insitu_{iout:05d}.pickle` save done")
+    pklsave(results, f"{database2}/stable_prog/props/insitu_{iout:05d}.pickle")
+    print(f"`{database2}/stable_prog/props/insitu_{iout:05d}.pickle` save done")
     flush(msg=True)
