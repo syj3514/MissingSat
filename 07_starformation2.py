@@ -1,6 +1,8 @@
 from IPython import get_ipython
 
 ncpu=48
+home = '/home/jeon'
+if(not os.path.isdir(home)): home = '/gem_home/jeon'
 def type_of_script():
     """
     Detects and returns the type of python kernel
@@ -54,7 +56,7 @@ from common_func import *
 
 
 mode2 = 'nh2'
-database2 = f"/home/jeon/MissingSat/database/{mode2}"
+database2 = f"{home}/MissingSat/database/{mode2}"
 iout2 = 797
 repo2, rurmode2, dp2 = mode2repo(mode2)
 snap2 = uri.RamsesSnapshot(repo2, iout2, mode=rurmode2)
