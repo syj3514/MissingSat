@@ -164,3 +164,103 @@ def calc_tform(part, weights, ratio=0.5):
     sw = np.cumsum(weights[argsort])
     sw /= sw[-1]
     return age[argsort][np.argmin(np.abs(sw-ratio))]
+
+
+
+
+
+
+# Test Branch
+# def massbranch(branch):
+#     val = np.log10(branch['mvir'])
+#     firstm = val[0]
+#     mask1 = np.full(len(branch), True, dtype=bool)
+#     for i in range(len(mask1)):
+#         if(val[i] < 9): continue
+#         arr = val[max(0,i-100):i+100]
+#         mask1[i] = val[i] <= min( (np.mean(arr) + 4*np.std(arr)), firstm+3 )
+#     upper = (np.median(val) + 3*np.std(val))
+#     if(upper>8.5):
+#         mask2 = val <= upper
+#         return mask1&mask2
+#     return mask1
+def _mass_local(logmvir, oldmask):
+    mask_local = np.full(len(logmvir), True, dtype=bool)*oldmask
+    for i in range(len(mask_local)):
+        if(~oldmask[i]): continue
+        if(logmvir[i] < 9): continue
+        arr = logmvir[max(0,i-100):i+100]
+        mask_local[i] = logmvir[i] <= min( (np.mean(arr) + 4*np.std(arr)), logmvir[0]+3 )
+    return mask_local
+
+def massbranch(branch):
+    oldmask = np.full(len(branch), True)
+    val = np.log10(branch['mvir'])
+    firstm = val[0]
+    if(np.max(val) < firstm+1.5):
+        return oldmask
+    else:
+        mask_local = _mass_local(val, oldmask)
+        a = np.median(val[oldmask]); b = np.std(val[oldmask]); err = min(3*b, 3)
+        mask_global = (val <= (a + err))&(oldmask)
+        newmask = mask_local&mask_global
+        while(np.sum(oldmask) != np.sum(newmask)):
+            oldmask = oldmask&newmask
+            mask_local = _mass_local(val, oldmask)
+            a = np.median(val[oldmask]); b = np.std(val[oldmask]); err = min(3*b, 3)
+            if(np.max(val[oldmask]) < a+2): break
+            mask_global = (val <= (a + err))&(oldmask)
+            newmask = mask_local&mask_global
+        mmask = oldmask&newmask
+    return mmask
+
+def velbranch(branch, snaps):
+    iout = snaps.iout_avail['iout']
+    fsnap = snaps.get_snap(iout[-1]); unitl_com = fsnap.unit_l/fsnap.aexp
+    aexp = snaps.iout_avail['aexp']
+    age = snaps.iout_avail['age']
+    mask = np.full(len(branch), False, dtype=bool)
+    mask[0] = True
+    factor = 1
+    for i in range(len(mask)-1):
+        if(mask[i]):
+            nb = branch[i]
+            niout = nb['timestep']; nwhere = np.where(iout == niout)[0][0]; nage = age[nwhere]
+            unit_l = unitl_com * aexp[nwhere]
+        pb = branch[i+1]
+        piout = pb['timestep']; pwhere = np.where(iout == piout)[0][0]; page = age[pwhere]
+        dt = (nage - page)*1e9 * 365*24*3600 # sec
+        dx = (nb['vx']*dt) * 1e5 # cm
+        dy = (nb['vy']*dt) * 1e5
+        dz = (nb['vz']*dt) * 1e5
+        nnx = nb['x'] - dx/unit_l
+        nny = nb['y'] - dy/unit_l
+        nnz = nb['z'] - dz/unit_l
+        dist2 = np.sqrt( (nnx-pb['x'])**2 + (nny-pb['y'])**2 + (nnz-pb['z'])**2 )
+        if(dist2 < factor*(nb['rvir']+pb['rvir'])) and (pb['mvir'] < nb['mvir']*1e2):
+            mask[i+1] = True
+            factor = 1
+        else:
+            factor += 0.01
+    return mask
+
+def polybranch(branch, vmask=None, return_poly=False):
+    if(vmask is None): vmask = np.full(len(branch), 0)
+    score = (branch['take_score']*branch['give_score']) * (vmask+0.5)
+    polyx = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['x'], 20, w=score)
+    resix = branch['x'] - polyx(branch['timestep'])
+    stdx = np.std(resix)
+    polyy = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['y'], 20, w=score)
+    resiy = branch['y'] - polyy(branch['timestep'])
+    stdy = np.std(resiy)
+    polyz = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['z'], 20, w=score)
+    resiz = branch['z'] - polyz(branch['timestep'])
+    stdz = np.std(resiz)
+
+    resi = np.sqrt(resix**2 + resiy**2 + resiz**2)
+    where1 = (resi > np.sqrt(stdx**2 + stdy**2 + stdz**2))
+    where2 = resi/np.sqrt(3) > 1e-4
+    where = where1&where2
+    if(return_poly):
+        return (~where), polyx, polyy, polyz
+    return (~where)

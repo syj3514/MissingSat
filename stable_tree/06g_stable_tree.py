@@ -53,69 +53,15 @@ from common_func import *
 
 
 
-def massbranch(branch):
-    val = np.log10(branch['mvir'])
-    mask1 = np.full(len(branch), True, dtype=bool)
-    for i in range(len(mask1)):
-        if(val[i] < 9): continue
-        arr = val[max(0,i-100):i+100]
-        mask1[i] = val[i] <= (np.mean(arr) + 4*np.std(arr))
-    upper = (np.median(val) + 3*np.std(val))
-    if(upper>8.5):
-        mask2 = val <= upper
-        return mask1&mask2
-    return mask1
+# def massbranch(branch):
+#    See `common_func.py`
 
-def velbranch(branch, snaps):
-    iout = snaps.iout_avail['iout']
-    fsnap = snaps.get_snap(iout[-1]); unitl_com = fsnap.unit_l/fsnap.aexp
-    aexp = snaps.iout_avail['aexp']
-    age = snaps.iout_avail['age']
-    mask = np.full(len(branch), False, dtype=bool)
-    mask[0] = True
-    factor = 1
-    for i in range(len(mask)-1):
-        if(mask[i]):
-            nb = branch[i]
-            niout = nb['timestep']; nwhere = np.where(iout == niout)[0][0]; nage = age[nwhere]
-            unit_l = unitl_com * aexp[nwhere]
-        pb = branch[i+1]
-        piout = pb['timestep']; pwhere = np.where(iout == piout)[0][0]; page = age[pwhere]
-        dt = (nage - page)*1e9 * 365*24*3600 # sec
-        dx = (nb['vx']*dt) * 1e5 # cm
-        dy = (nb['vy']*dt) * 1e5
-        dz = (nb['vz']*dt) * 1e5
-        nnx = nb['x'] - dx/unit_l
-        nny = nb['y'] - dy/unit_l
-        nnz = nb['z'] - dz/unit_l
-        dist2 = np.sqrt( (nnx-pb['x'])**2 + (nny-pb['y'])**2 + (nnz-pb['z'])**2 )
-        if(dist2 < factor*(nb['rvir']+pb['rvir'])) and (pb['mvir'] < nb['mvir']*1e2):
-            mask[i+1] = True
-            factor = 1
-        else:
-            factor += 0.01
-    return mask
+# def velbranch(branch, snaps):
+#    See `common_func.py`
 
-def polybranch(branch, vmask=None, return_poly=False):
-    if(vmask is None): vmask = np.full(len(branch), 0)
-    score = (branch['take_score']*branch['give_score']) * (vmask+0.5)
-    polyx = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['x'], 20, w=score)
-    resix = branch['x'] - polyx(branch['timestep'])
-    stdx = np.std(resix)
-    polyy = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['y'], 20, w=score)
-    resiy = branch['y'] - polyy(branch['timestep'])
-    stdy = np.std(resiy)
-    polyz = np.polynomial.polynomial.Polynomial.fit(branch['timestep'], branch['z'], 20, w=score)
-    resiz = branch['z'] - polyz(branch['timestep'])
-    stdz = np.std(resiz)
+# def polybranch(branch, vmask=None, return_poly=False):
+#    See `common_func.py`
 
-    resi = np.sqrt(resix**2 + resiy**2 + resiz**2)
-    where1 = (resi > np.sqrt(stdx**2 + stdy**2 + stdz**2))
-    where2 = resi/np.sqrt(3) > 1e-4
-    where = where1&where2
-    if(return_poly):
-        return (~where), polyx, polyy, polyz
-    return (~where)
 
 ####################################################
 # New Horizon
