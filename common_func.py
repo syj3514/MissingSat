@@ -6,6 +6,51 @@ from icl_draw import fancy_axes
 import os, glob
 from IPython import get_ipython
 
+
+from functools import lru_cache
+def out2gyr(outs, snaps):
+    table = snaps.iout_avail
+    gyrs = np.zeros(len(outs))
+
+    iout_table = table['iout']
+    gyr_table = table['age']
+    @lru_cache(None)
+    def gyrfromout(iout):
+        arg = iout_table==iout
+        return gyr_table[arg][0]
+    
+    for i, iout in enumerate(outs):
+        gyrs[i] = gyrfromout(iout)#table[table['iout']==iout][0]['age']
+    return gyrs
+
+def extract_from_LG(LG):
+    allsats = None; allsubs = None; states = None
+    keys = list(LG.keys())
+    for key in keys:
+        sats = LG[key]['sats']; subs = LG[key]['subs']; real = LG[key]['real']
+        dink = real[real['state']=='dink']['hid']
+        ind = np.isin(subs['id'], dink)
+        subs['dink'][ind] = True; subs['dink'][~ind] = False
+        state = np.zeros(len(subs), dtype='<U7')
+        state[ind] = 'dink'; state[~ind] = 'pair'
+        
+        upair = real[real['state']=='upair']['hid']
+        ind = np.isin(subs['id'], upair)
+        state[ind] = 'upair'
+
+        allsats = sats if allsats is None else np.hstack((allsats, sats))
+        allsubs = subs if allsubs is None else np.hstack((allsubs, subs))
+        states = state if states is None else np.hstack((states, state))
+    argsort = np.argsort(allsubs['id'])
+    allsubs = allsubs[argsort]; states = states[argsort]
+    dinks = allsubs[states == 'dink']
+    pairs = allsubs[states == 'pair']
+    upairs = allsubs[states == 'upair']
+    for dink in dinks: assert dink['dink']
+    for pair in pairs: assert ~pair['dink']
+    for upair in upairs: assert ~upair['dink']
+    return allsats, allsubs, states, dinks, pairs, upairs
+
 def _ibox(h, factor=1, rname='r'):
     return np.array([[h['x']-factor*h[rname], h['x']+factor*h[rname]],
                         [h['y']-factor*h[rname], h['y']+factor*h[rname]],
