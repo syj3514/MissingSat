@@ -190,7 +190,7 @@ for targetid in ids:
         ax_star = ax_dm.inset_axes([buffer*2/3, 1-length+buffer, (length-buffer*2)*2/3, (length-buffer*2)], xticks=[], yticks=[], facecolor='k')
         for spine in ax_star.spines.values(): spine.set_edgecolor('orange')
         if(len(part['star'])<(nmax/10))and(len(part['star'])>0):
-            ax_star.scatter(part['star']['x'], part['star']['y'], s=(nmax/40)/len(part['star']), ec='none', fc='orange',marker="*")
+            ax_star.scatter(part['star']['x'], part['star']['y'], s=(nmax/80)/len(part['star']), ec='none', fc='orange',marker="*")
             ax_star.set_xlim(*isnap.box[0]); ax_star.set_ylim(*isnap.box[1])
         elif(len(part['star'])==0):
             ax_star.scatter(part['star']['x'], part['star']['y'], s=0, ec='none', fc='orange',marker="*")
@@ -357,10 +357,10 @@ for targetid in ids:
         markerline, stemlines, baseline = stemcontainer
         markerline.set_markersize(1)
         markerline.set_marker('*')
-        stemlines.set_linewidth(0.4)
+        stemlines.set_linewidth(0.6)
         stemlines.set_zorder(-1)
-        stemlines.set_alpha(0.5)
-        lax2.set_ylim(0.001,)
+        stemlines.set_alpha(0.7)
+        lax2.set_yscale('log'); lax2.set_ylim(0.9,)
 
         lines = l1+l2+l3+l4+[l5] +[stemcontainer]
         labels = [l.get_label() for l in lines]
