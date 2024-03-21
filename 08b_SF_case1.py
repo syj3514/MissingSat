@@ -77,6 +77,7 @@ ncpu=args.ncpu
 ################ Setting
 home = '/home/jeon'
 if(not os.path.isdir(home)): home = '/gem_home/jeon'
+elif(not type_of_script() == 'jupyter'): os.nice(19)
 
 mode1 = 'nh'; database1 = f"{home}/MissingSat/database/{mode1}"
 iout1 = 1026; repo1, rurmode1, dp1 = mode2repo(mode1)
@@ -128,6 +129,7 @@ for targetid in ids:
 
     for iout in tqdm(branch['timestep'][::-1], desc=f"[{targetid:07d}]"):
         if(iout>imax)or(iout<imin): continue
+        if(os.path.exists(f"{path}/{targetid:07d}/{targetid:07d}_{iout:04d}.png")): continue
         isnap = snap1s.get_snap(iout)
         
         fig = plt.figure(figsize=(12,9), layout="constrained", dpi=150, facecolor='k')
@@ -305,7 +307,11 @@ for targetid in ids:
         sax2.scatter(incold['rho','H/cc'], incold['T','K'], s=1.5, fc='royalblue', ec='none', zorder=1)
         sax2.set_xscale('log'); sax2.set_xlim(2e-6,1e3); sax2.set_xlabel(r'$\rho$ [H/cc]', fontsize=12)
         sax2.set_yscale('log'); sax2.set_ylim(5e1,9e6); sax2.set_ylabel('T [K]', fontsize=12); sax2.yaxis.set_label_position("right")
-        sax2.text(0.05, 0.05, fr"$\rho_{{max}}={np.max(incell['rho','H/cc']):.2f}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
+        rhomax = np.max(incell['rho','H/cc'])
+        if(rhomax>=0.01):
+            sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2f}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
+        else:
+            sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2e}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
         sax2.text(0.5, 0.99, "Gas Phase", ha='center', va='top', fontsize=12, transform=sax2.transAxes, family='DejaVu Serif', path_effects=[patheffects.withSimplePatchShadow(offset=(0.5,-0.5), shadow_rgbFace='grey', alpha=0.3)])
         ax_change_color(sax2, 'w')
 
