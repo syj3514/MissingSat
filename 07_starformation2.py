@@ -310,6 +310,7 @@ outs = np.array(list(finddict.keys()))
 ###########################################################
 # Snapshot
 ###########################################################
+from ramses_function import *
 for iout in outs:
     snap = snap2s.get_snap(iout)
     ids = finddict[iout]
@@ -325,27 +326,24 @@ for iout in outs:
     else:
         if(not os.path.isdir(f"{database2}/SF/{iout:05d}")):
             os.makedirs(f"{database2}/SF/{iout:05d}")
+    # Variable in this snapshot
+    h0 = params('h0', snap)
+    aexp = params('aexp', snap)
+    omega_m = params('omega_m', snap)
+    scale_nH = params('scale_nH', snap)
+    nCOM = params('nCOM', snap)
+    d_gmc = params('d_gmc', snap)
+    factG = params('factG', snap)
+    dt_old = params('dt_old', snap)
+    dt_new = params('dt_new', snap)
+    mass_sph = params('mass_sph', snap)
+    localseed = params('localseed', snap)[:4]
+    nlevelmax = snap.params['levelmax']
+    dx_min   = 0.5**nlevelmax
+    vol_min  = dx_min**snap.params['ndim']
+    dt_iout = get_dt(snap, snap2s)
     for target in tqdm(targets, desc=f"[iout={iout}]"):
         tid = target['id']; iid = target['lastid']
-        from ramses_function import *
-        # Variable in this snapshot
-        h0 = params('h0', snap)
-        aexp = params('aexp', snap)
-        omega_m = params('omega_m', snap)
-        scale_nH = params('scale_nH', snap)
-        nCOM = params('nCOM', snap)
-        d_gmc = params('d_gmc', snap)
-        factG = params('factG', snap)
-        dt_old = params('dt_old', snap)
-        dt_new = params('dt_new', snap)
-        mass_sph = params('mass_sph', snap)
-        localseed = params('localseed', snap)
-        nlevelmax = snap.params['levelmax']
-        dx_min   = 0.5**nlevelmax
-        vol_min  = dx_min**snap.params['ndim']
-        dt_iout = get_dt(snap, snap2s)
-
-
         newcells = cell_calc(target, snap)
         newcells['id'] = tid; newcells['lastid'] = iid
         pklsave(newcells, f"{database2}/SF/{iout:05d}/{iid:07d}.pickle")

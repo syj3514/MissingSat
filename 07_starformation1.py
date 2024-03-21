@@ -52,9 +52,10 @@ from multiprocessing import Pool, shared_memory, Value
 from common_func import *
 
 
-
+home = '/home/jeon'
+if(not os.path.isdir(home)): home = '/gem_home/jeon'
 mode1 = 'nh'
-database1 = f"/home/jeon/MissingSat/database/{mode1}"
+database1 = f"{home}/MissingSat/database/{mode1}"
 iout1 = 1026
 repo1, rurmode1, dp1 = mode2repo(mode1)
 snap1 = uri.RamsesSnapshot(repo1, iout1, mode=rurmode1)
@@ -311,6 +312,7 @@ outs = np.array(list(finddict.keys()))
 ###########################################################
 # Snapshot
 ###########################################################
+from ramses_function import *
 for iout in outs:
     snap = snap1s.get_snap(iout)
     ids = finddict[iout]
@@ -326,27 +328,24 @@ for iout in outs:
     else:
         if(not os.path.isdir(f"{database1}/SF/{iout:05d}")):
             os.makedirs(f"{database1}/SF/{iout:05d}")
+    # Variable in this snapshot
+    h0 = params('h0', snap)
+    aexp = params('aexp', snap)
+    omega_m = params('omega_m', snap)
+    scale_nH = params('scale_nH', snap)
+    nCOM = params('nCOM', snap)
+    d_gmc = params('d_gmc', snap)
+    factG = params('factG', snap)
+    dt_old = params('dt_old', snap)
+    dt_new = params('dt_new', snap)
+    mass_sph = params('mass_sph', snap)
+    localseed = params('localseed', snap)
+    nlevelmax = snap.params['levelmax']
+    dx_min   = 0.5**nlevelmax
+    vol_min  = dx_min**snap.params['ndim']
+    dt_iout = get_dt(snap, snap1s)
     for target in tqdm(targets, desc=f"[iout={iout}]"):
         tid = target['id']; iid = target['lastid']
-        from ramses_function import *
-        # Variable in this snapshot
-        h0 = params('h0', snap)
-        aexp = params('aexp', snap)
-        omega_m = params('omega_m', snap)
-        scale_nH = params('scale_nH', snap)
-        nCOM = params('nCOM', snap)
-        d_gmc = params('d_gmc', snap)
-        factG = params('factG', snap)
-        dt_old = params('dt_old', snap)
-        dt_new = params('dt_new', snap)
-        mass_sph = params('mass_sph', snap)
-        localseed = params('localseed', snap)
-        nlevelmax = snap.params['levelmax']
-        dx_min   = 0.5**nlevelmax
-        vol_min  = dx_min**snap.params['ndim']
-        dt_iout = get_dt(snap, snap1s)
-
-
         newcells = cell_calc(target, snap)
         newcells['id'] = tid; newcells['lastid'] = iid
         pklsave(newcells, f"{database1}/SF/{iout:05d}/{iid:07d}.pickle")
