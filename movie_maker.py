@@ -9,7 +9,7 @@ parser.add_argument("-i", "--iid", required=True, help='target halo id', type=in
 args = parser.parse_args()
 
 iid = args.iid
-directory = f"/home/jeon/MissingSat/database/nh/photo"
+directory = f"/home/jeon/MissingSat/database/nh2/photo/evolution/d/3"
 
 fnames = os.listdir(f"{directory}/{iid:07d}")
 fnames = [f"{directory}/{iid:07d}/{f}" for f in fnames if f.endswith(".png")]

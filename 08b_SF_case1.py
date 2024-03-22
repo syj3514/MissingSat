@@ -210,7 +210,7 @@ for targetid in ids:
         length = 0.4
         ###### Gas Map
         # Data Process
-        incell = cut_sphere(cell, target['x'], target['y'], target['z'], target['rvir'])
+        incell = cut_sphere(cell, target['x'], target['y'], target['z'], max(target['rvir'], np.min(cell['dx'])))
         # Drawing
         ax_gas = ax_dm.inset_axes([buffer*2/3, buffer, (length-buffer*2)*2/3, (length-buffer*2)], xticks=[], yticks=[], facecolor='k')
         for spine in ax_gas.spines.values(): spine.set_edgecolor('white')
@@ -307,11 +307,14 @@ for targetid in ids:
         sax2.scatter(incold['rho','H/cc'], incold['T','K'], s=1.5, fc='royalblue', ec='none', zorder=1)
         sax2.set_xscale('log'); sax2.set_xlim(2e-6,1e3); sax2.set_xlabel(r'$\rho$ [H/cc]', fontsize=12)
         sax2.set_yscale('log'); sax2.set_ylim(5e1,9e6); sax2.set_ylabel('T [K]', fontsize=12); sax2.yaxis.set_label_position("right")
-        rhomax = np.max(incell['rho','H/cc'])
-        if(rhomax>=0.01):
-            sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2f}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
+        if(len(incell)>0):
+            rhomax = np.max(incell['rho','H/cc'])
+            if(rhomax>=0.01):
+                sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2f}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
+            else:
+                sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2e}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
         else:
-            sax2.text(0.05, 0.05, fr"$\rho_{{max}}={rhomax:.2e}\,$[H/cc]", ha='left', va='bottom', fontsize=12, transform=sax2.transAxes)
+            rhomax = 0
         sax2.text(0.5, 0.99, "Gas Phase", ha='center', va='top', fontsize=12, transform=sax2.transAxes, family='DejaVu Serif', path_effects=[patheffects.withSimplePatchShadow(offset=(0.5,-0.5), shadow_rgbFace='grey', alpha=0.3)])
         ax_change_color(sax2, 'w')
 
