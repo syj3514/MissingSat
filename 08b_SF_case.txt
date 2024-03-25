@@ -1,0 +1,62 @@
+##### NH1 #####
+## Dink ##
+0       1       2
+G06     -       -   
+vv
+3       4       5
+G06     Done    -   
+vv      vv
+6       7       8
+G06     G06     -   
+vv      vv
+## Pair ##
+0       1       2
+-       -       -   
+
+3       4       5
+-       -       -   
+
+6       7       8
+Done    T15     T04
+vv
+## UDG ##
+0       1       2
+-       -       -   
+
+3       4       5
+-       -       -   
+
+6       7       8
+T04     Done    Done
+        vv      vv
+##### NH2 #####
+## Dink ##
+0       1       2
+G10     -       -   
+vv
+3       4       5
+G10     Done    -   
+vv      vv
+6       7       8
+G10     G10     Done
+v       vv       vv
+## Pair ##
+0       1       2
+-       -       -   
+
+3       4       5
+-       -       -   
+
+6       7       8
+-       T04     G10
+                vv
+## UDG ##
+0       1       2
+-       -       -   
+
+3       4       5
+-       -       -   
+
+6       7       8
+Done    Done    Done
+                vv
